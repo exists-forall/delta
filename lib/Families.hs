@@ -1,8 +1,5 @@
 module Families (Family, Index, buildFamilies) where
 
-import qualified DirectedGraph
-import DirectedGraph (DirectedGraph)
-
 import qualified Data.Map as Map
 import Data.Map (Map)
 
