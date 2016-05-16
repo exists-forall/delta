@@ -30,7 +30,9 @@ test-suite delta-type-inference-tests
   hs-source-dirs:      test, lib
   main-is:             Spec.hs
 
-  other-modules:       DirectedGraph
+  other-modules:       TestUtils
+
+                     , DirectedGraph
                      , DirectedGraphTests
 
                      , Families
@@ -55,3 +57,4 @@ test-suite delta-type-inference-tests
                      , containers
                      , mtl
                      , hspec
+                     , hspec-core

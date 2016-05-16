@@ -36,7 +36,7 @@ normalize (0 : xs) =
   case normalize xs of
     [] -> []
     xs' -> 0 : xs'
-normalize xs = xs
+normalize (x : xs) = x : normalize xs
 
 -- Smart constructor for preserving invariants
 indexSet :: [Segment] -> IndexSet
@@ -72,7 +72,7 @@ member i (IndexSet segs) = member' i segs
 
 union' :: [Segment] -> [Segment] -> [Segment]
 union' xs [] = xs
-union' [] ys = []
+union' [] ys = ys
 union' (x : xs) (y : ys) = (x .|. y) : (union' xs ys)
 
 union :: IndexSet -> IndexSet -> IndexSet
