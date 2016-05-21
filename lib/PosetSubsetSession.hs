@@ -4,7 +4,7 @@ module PosetSubsetSession
   ( Relation (ChildOf)
   , Poset
   , Node
-  , NodeValue
+  , NodeValue (..)
 
   , buildPoset
   , runSession
