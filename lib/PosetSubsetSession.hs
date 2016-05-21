@@ -4,6 +4,7 @@ module PosetSubsetSession
   ( Relation (ChildOf)
   , Poset
   , Node
+  , NodeValue
 
   , buildPoset
   , runSession
@@ -64,6 +65,12 @@ data Node s a
   | TopNode -- ⊤
   | BotNode -- ⊥
   | FamilyNode (Poset a) Family Index
+
+data NodeValue a
+  = NodeValue a
+  | TopNodeValue
+  | BotNodeValue
+  deriving (Eq, Ord, Show)
 
 topNode :: Node s a
 topNode = TopNode
@@ -239,12 +246,18 @@ relationToConnection (child `ChildOf` parent) = (child, parent)
 relationToEdge :: Relation a -> DirectedGraph.Edge a
 relationToEdge (child `ChildOf` parent) = child `DirectedGraph.EdgeTo` parent
 
-runSession :: (Ord a) => (forall s. (a -> Node s a) -> b) -> Poset a -> b
+runSession :: (Ord a) => (forall s. (a -> Node s a) -> (Node s a -> NodeValue a) -> b) -> Poset a -> b
 runSession body poset =
   let
     toNode val =
       case Map.lookup val (nodesForValues poset) of
         Just (family, index) -> FamilyNode poset family index
         Nothing -> SolitaryNode val
+
+    fromNode (SolitaryNode val) = NodeValue val
+    fromNode TopNode = TopNodeValue
+    fromNode BotNode = BotNodeValue
+    fromNode (FamilyNode _ family index) =
+      NodeValue ((valuesForNodes poset) Map.! (family, index))
   in
-    body toNode
+    body toNode fromNode
