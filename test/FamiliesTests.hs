@@ -2,6 +2,8 @@ module FamiliesTests (test) where
 
 import Families
 
+import TestUtils
+
 import Test.Hspec
 
 import qualified Data.Set as Set
@@ -9,12 +11,6 @@ import Data.Set (Set)
 
 import qualified Data.Map as Map
 import Data.Map (Map)
-
-allSame :: (Eq a) => [a] -> Bool
-allSame xs = and (zipWith (==) xs (tail xs))
-
-allDifferent :: (Ord a) => [a] -> Bool
-allDifferent xs = Set.size (Set.fromList xs) == length xs
 
 test :: Spec
 test = describe "Families" $ do
