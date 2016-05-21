@@ -3,7 +3,6 @@ module Families (Family, Index, buildFamilies) where
 import qualified Data.Map as Map
 import Data.Map (Map)
 
-import Data.Function ((&))
 import Data.Maybe (fromMaybe)
 
 type Family = Int

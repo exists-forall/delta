@@ -71,22 +71,30 @@ topNode = TopNode
 botNode :: Node s a
 botNode = BotNode
 
+-- The only purpose of this data type is to auto-derive Eq and Ord instances for it.
+-- We then use those Eq and Ord instances to define the equivalent operations on normal Nodes,
+-- by projecting from Nodes to ComparisonNodes.
+-- Eq and Ord instances cannot be derived for Nodes directly because that would involve comparing the
+-- Posets of FamilyNodes, which is both computationally wasteful (because they should be identical)
+-- and impossible, because there are no Eq or Ord instances for Poset.
+data ComparisonNode a
+  = SolitaryComparisonNode a
+  | TopComparisonNode
+  | BotComparisonNode
+  | FamilyComparisonNode Family Index
+  deriving (Eq, Ord)
+
+toComparisonNode :: Node s a -> ComparisonNode a
+toComparisonNode (SolitaryNode val) = SolitaryComparisonNode val
+toComparisonNode TopNode = TopComparisonNode
+toComparisonNode BotNode = BotComparisonNode
+toComparisonNode (FamilyNode _ family index) = FamilyComparisonNode family index
+
 instance (Eq a) => Eq (Node s a) where
-  (FamilyNode _ family1 index1) == (FamilyNode _ family2 index2) =
-    (family1 == family2) && (index1 == index2)
-
-  (SolitaryNode x) == (SolitaryNode y) = x == y
-
-  _ == _ = False
+  a == b = toComparisonNode a == toComparisonNode b
 
 instance (Ord a) => Ord (Node s a) where
-  compare (FamilyNode _ family1 index1) (FamilyNode _ family2 index2) =
-    mappend (compare family1 family2) (compare index1 index2)
-
-  compare (SolitaryNode x) (SolitaryNode y) = compare x y
-
-  compare (SolitaryNode _) (FamilyNode _ _ _) = LT
-  compare (FamilyNode _ _ _) (SolitaryNode _) = GT
+  compare a b = compare (toComparisonNode a) (toComparisonNode b)
 
 data Lower
 data Upper
@@ -124,7 +132,7 @@ extendWithParents (FamilyNode poset family index) =
 member :: (Ord a) => (Node s a) -> Subset form s a -> Bool
 member _ Universal = True
 member (SolitaryNode x) (SolitarySubset y) = x == y
-member (FamilyNode poset family index) (FamilialSubset _ setFamily setIndices) =
+member (FamilyNode _ family index) (FamilialSubset _ setFamily setIndices) =
   family == setFamily && index `IndexSet.member` setIndices
 member _ _ = False
 

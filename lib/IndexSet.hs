@@ -61,7 +61,7 @@ fromIndices :: [Int] -> IndexSet
 fromIndices = foldl union empty . map singleton
 
 member' :: Int -> [Segment] -> Bool
-member' i [] = False
+member' _ [] = False
 member' i (x : xs) =
   if i < bitsPerSeg
     then testBit x i
@@ -83,7 +83,7 @@ intersection (IndexSet xs) (IndexSet ys) = indexSet (zipWith (.&.) xs ys)
 
 diff' :: [Segment] -> [Segment] -> [Segment]
 diff' xs [] = xs
-diff' [] ys = []
+diff' [] _  = []
 diff' (x : xs) (y : ys) =
   (x .&. complement y) : (diff' xs ys)
 

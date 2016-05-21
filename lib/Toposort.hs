@@ -12,7 +12,6 @@ import Data.Maybe (fromMaybe)
 
 import qualified Control.Monad.State as State
 
-import Control.Monad (mapM_)
 import Control.Monad.Trans (lift)
 
 data TopoSortState a = TopoSortState
