@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE Rank2Types, DataKinds, KindSignatures, ScopedTypeVariables #-}
 
 module PosetSubsetSession
   ( Relation (ChildOf)
@@ -12,8 +12,8 @@ module PosetSubsetSession
   , topNode
   , botNode
 
-  , Lower
-  , Upper
+  , SubsetForm (..)
+  , HasExtremalNodes
   , Subset
 
   , extendWithChildren
@@ -103,10 +103,12 @@ instance (Eq a) => Eq (Node s a) where
 instance (Ord a) => Ord (Node s a) where
   compare a b = compare (toComparisonNode a) (toComparisonNode b)
 
-data Lower
-data Upper
+instance (Ord a, Show a) => Show (Node s a) where
+  showsPrec prec = showsPrec prec . fromNode
+
+data SubsetForm = Lower | Upper
 -- All subsets of a given `s` should have the same `Poset`
-data Subset form s a
+data Subset (form :: SubsetForm) (s :: *) (a :: *)
   = Universal -- ↓{⊤}, ↑{⊥}
   | Trivial   -- ↓{⊥}, ↑{⊤}
   | SolitarySubset a
@@ -122,22 +124,23 @@ familialSubset poset family indices =
     then Trivial
     else FamilialSubset poset family indices
 
-extendWithChildren :: (Ord a) => Node s a -> Subset Lower s a
+extendWithChildren :: (Ord a) => Node s a -> Subset 'Lower s a
 extendWithChildren TopNode = Universal
 extendWithChildren BotNode = Trivial
 extendWithChildren (SolitaryNode x) = (SolitarySubset x)
 extendWithChildren (FamilyNode poset family index) =
   FamilialSubset poset family ((childrenForNodes poset) ! (family, index))
 
-extendWithParents :: (Ord a) => Node s a -> Subset Upper s a
+extendWithParents :: (Ord a) => Node s a -> Subset 'Upper s a
 extendWithParents TopNode = Trivial
 extendWithParents BotNode = Universal
 extendWithParents (SolitaryNode x) = (SolitarySubset x)
 extendWithParents (FamilyNode poset family index) =
   FamilialSubset poset family ((parentsForNodes poset) ! (family, index))
 
-member :: (Ord a) => (Node s a) -> Subset form s a -> Bool
+member :: forall form s a. (HasExtremalNodes form, Ord a) => (Node s a) -> Subset form s a -> Bool
 member _ Universal = True
+member node _ | node == trivialNode (extremalNodes :: ExtremalNodes form) = True
 member (SolitaryNode x) (SolitarySubset y) = x == y
 member (FamilyNode _ family index) (FamilialSubset _ setFamily setIndices) =
   family == setFamily && index `IndexSet.member` setIndices
@@ -163,9 +166,23 @@ intersection (FamilialSubset poset family1 indices1) (FamilialSubset _ family2 i
 
 intersection _ _ = Trivial
 
-extremal :: (Poset a -> Map (Family, Index) IndexSet) -> (Poset a -> Map (Family, IndexSet) Index) -> Subset form s a -> [Node s a]
-extremal _ _ Universal = [TopNode]
-extremal _ _ Trivial = [BotNode]
+data ExtremalNodes (form :: SubsetForm) = ExtremalNodes
+  { trivialNode :: forall s a. Node s a
+  , universalNode :: forall s a. Node s a
+  }
+
+class HasExtremalNodes (form :: SubsetForm) where
+  extremalNodes :: ExtremalNodes form
+
+instance HasExtremalNodes 'Lower where
+  extremalNodes = ExtremalNodes BotNode TopNode
+
+instance HasExtremalNodes 'Upper where
+  extremalNodes = ExtremalNodes TopNode BotNode
+
+extremal :: forall a s form. (HasExtremalNodes form) => (Poset a -> Map (Family, Index) IndexSet) -> (Poset a -> Map (Family, IndexSet) Index) -> Subset form s a -> [Node s a]
+extremal _ _ Universal = [universalNode (extremalNodes :: ExtremalNodes form)]
+extremal _ _ Trivial = [trivialNode (extremalNodes :: ExtremalNodes form)]
 extremal _ _ (SolitarySubset x) = [SolitaryNode x]
 extremal extensionForNodes nodesForExtension (FamilialSubset poset family indices) =
   case Map.lookup (family, indices) (nodesForExtension poset) of
@@ -181,10 +198,10 @@ extremal extensionForNodes nodesForExtension (FamilialSubset poset family indice
       in
         map (FamilyNode poset family) extremalIndices
 
-maximal :: Subset Lower s a -> [Node s a]
+maximal :: Subset 'Lower s a -> [Node s a]
 maximal = extremal childrenForNodes nodesForChildren
 
-minimal :: Subset Upper s a -> [Node s a]
+minimal :: Subset 'Upper s a -> [Node s a]
 minimal = extremal parentsForNodes nodesForParents
 
 type ImmediatePredecessors = Map (Family, Index) [(Family, Index)]
@@ -246,18 +263,18 @@ relationToConnection (child `ChildOf` parent) = (child, parent)
 relationToEdge :: Relation a -> DirectedGraph.Edge a
 relationToEdge (child `ChildOf` parent) = child `DirectedGraph.EdgeTo` parent
 
-runSession :: (Ord a) => (forall s. (a -> Node s a) -> (Node s a -> NodeValue a) -> b) -> Poset a -> b
-runSession body poset =
-  let
-    toNode val =
-      case Map.lookup val (nodesForValues poset) of
-        Just (family, index) -> FamilyNode poset family index
-        Nothing -> SolitaryNode val
+toNode :: (Ord a) => Poset a -> a -> Node s a
+toNode poset val =
+  case Map.lookup val (nodesForValues poset) of
+    Just (family, index) -> FamilyNode poset family index
+    Nothing -> SolitaryNode val
 
-    fromNode (SolitaryNode val) = NodeValue val
-    fromNode TopNode = TopNodeValue
-    fromNode BotNode = BotNodeValue
-    fromNode (FamilyNode _ family index) =
-      NodeValue ((valuesForNodes poset) Map.! (family, index))
-  in
-    body toNode fromNode
+fromNode :: (Ord a) => Node s a -> NodeValue a
+fromNode (SolitaryNode val) = NodeValue val
+fromNode TopNode = TopNodeValue
+fromNode BotNode = BotNodeValue
+fromNode (FamilyNode poset family index) =
+  NodeValue ((valuesForNodes poset) Map.! (family, index))
+
+runSession :: (Ord a) => (forall s. (a -> Node s a) -> (Node s a -> NodeValue a) -> b) -> Poset a -> b
+runSession body poset = body (toNode poset) fromNode
