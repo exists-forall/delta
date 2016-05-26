@@ -7,15 +7,12 @@ import TopoSort
 import qualified DirectedGraph
 import DirectedGraph (Edge (EdgeTo))
 
-import TestUtils (allSatisfy)
-
 import Test.Hspec
 
 import qualified Data.Map as Map
 import Data.Map (Map)
 
 import qualified Data.Set as Set
-import Data.Set (Set)
 
 import Data.Maybe (fromMaybe)
 
@@ -23,7 +20,7 @@ verifyToposort :: (Ord a) => Map a [a] -> [a] -> Bool
 verifyToposort dependencies order =
   let
     dependenciesOf = flip (Map.findWithDefault []) dependencies
-    go completed [] = True
+    go _ [] = True
     go completed (x : xs) =
       all (`Set.member` completed) (dependenciesOf x) && go (Set.insert x completed) xs
   in
@@ -31,11 +28,12 @@ verifyToposort dependencies order =
 
 containsDuplicates :: (Ord a) => [a] -> Bool
 containsDuplicates =
-  (/= Set.singleton 1) . Set.fromList . map snd . Map.toList . Map.fromListWith (+) . map (,1)
+  (/= Set.singleton 1) . Set.fromList . map snd . Map.toList . Map.fromListWith (+) . map (, 1 :: Integer)
 
 test :: Spec
 test = describe "TopoSort" $ do
   let
+    edges :: [Edge Integer]
     edges =
       [ (1 `EdgeTo`  4), (1 `EdgeTo`  5), (1 `EdgeTo` 6)
       , (2 `EdgeTo`  4), (2 `EdgeTo`  8), (3 `EdgeTo` 7)
@@ -61,10 +59,10 @@ test = describe "TopoSort" $ do
 
   describe "containsDuplicates" $ do
     it "returns True when a list contains duplicates" $
-      containsDuplicates [1, 2, 3, 4, 10, 5, -6, 4, 0] `shouldBe` True
+      containsDuplicates ([1, 2, 3, 4, 10, 5, -6, 4, 0] :: [Integer]) `shouldBe` True
 
     it "returns False when a list contains no duplicates" $
-      containsDuplicates [1, 2, 3, 4, 10, 5, -6, 0] `shouldBe` False
+      containsDuplicates ([1, 2, 3, 4, 10, 5, -6, 0] :: [Integer]) `shouldBe` False
 
   describe "topoSort" $ do
     let order = topoSort dependencies
