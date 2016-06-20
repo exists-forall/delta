@@ -19,6 +19,7 @@ library
                      , TopoSort
                      , DirectedGraph
                      , Families
+                     , Unify
                      , HelpfulUnsafeLookup
   ghc-options:         -Wall
   default-language:    Haskell2010
@@ -47,6 +48,9 @@ test-suite delta-type-inference-tests
 
                      , TopoSort
                      , TopoSortTests
+
+                     , Unify
+                     , UnifyTests
 
                      -- non-tested modules
                      , HelpfulUnsafeLookup
