@@ -1,11 +1,23 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Unify where
+module Unify
+  ( Type (..)
+  , Inequality (..)
+  , TypeError (..)
+
+  , EQUnifier
+  , LTEUnifier
+  , AsymUnifier
+  , Unifier (..)
+
+  , liftAtomUnifier
+  )
+where
 
 import Data.Tuple (swap)
 import Control.Applicative ((<|>))
 
-data Inequality = LTE | GTE
+data Inequality = LTE | GTE deriving (Eq, Ord, Show)
 
 flipInequality :: Inequality -> Inequality
 flipInequality LTE = GTE
@@ -19,6 +31,7 @@ data Type atom
   | App (Maybe (Type atom)) (Maybe (Type atom))
   | Func (Maybe (Type atom)) (Maybe (Type atom))
   | Tuple (Maybe (Type atom)) (Maybe (Type atom))
+  deriving (Eq, Ord, Show)
 
 data TypePair atom
   = TwoAtoms (Maybe atom) (Maybe atom)
