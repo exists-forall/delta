@@ -1,11 +1,9 @@
 module Families (Family, Index, buildFamilies) where
 
-import FoldInsert (foldInsert, consInsert)
+import FoldInsert (consInsert)
 
 import qualified Data.Map as Map
 import Data.Map (Map)
-
-import Data.Maybe (fromMaybe)
 
 type Family = Int
 type Index = Int
