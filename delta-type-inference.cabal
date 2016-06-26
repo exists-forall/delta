@@ -20,6 +20,7 @@ library
                      , DirectedGraph
                      , Families
                      , Unify
+                     , Propagate
 
                      -- Utility modules
                      , HelpfulUnsafeLookup
@@ -29,6 +30,7 @@ library
   build-depends:       base >= 4.7 && < 5
                      , containers
                      , mtl
+                     , transformers
 
 test-suite delta-type-inference-tests
   type:                exitcode-stdio-1.0
@@ -55,6 +57,9 @@ test-suite delta-type-inference-tests
                      , Unify
                      , UnifyTests
 
+                     , Propagate
+                     , PropagateTests
+
                      -- non-tested modules
                      , HelpfulUnsafeLookup
 
@@ -66,3 +71,4 @@ test-suite delta-type-inference-tests
                      , mtl
                      , hspec
                      , hspec-core
+                     , transformers
