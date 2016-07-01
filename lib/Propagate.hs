@@ -170,6 +170,7 @@ solve problem = runST $ runExceptT go where
 
     whileM (fmap (not . Set.null) $ lift $ readSTRef dirtyConstraints) $ do
       nextConstraint <- fmap Set.findMin $ lift $ readSTRef dirtyConstraints
+      lift $ modifySTRef' dirtyConstraints (Set.delete nextConstraint)
       applyConstraint nextConstraint
 
     finalVals <- fmap Map.fromList $
