@@ -6,7 +6,7 @@ module Propagate
   ( ChangeStatus (..)
   , ConstraintQuery
   , ConstraintEnforcer
-  , Problem
+  , Problem (..)
 
   , queryVar
   , solve
@@ -29,7 +29,7 @@ import Data.Maybe (fromMaybe, fromJust)
 
 import FoldInsert (fromListWithCons)
 
-data ChangeStatus = Changed | Unchanged
+data ChangeStatus = Changed | Unchanged deriving (Eq, Ord, Show)
 
 data ConstraintQuery var val a = ConstraintQuery
   { queryDependencies :: [var]
@@ -158,10 +158,15 @@ solve problem = runST $ runExceptT go where
         updates <- liftEither $ queryCompute (constraintEnforcer constraint) lookupForQuery
         forM_ updates $ \(var, newVal) -> do
           let node = lookupNode var
-          lift $ modifySTRef' (nodeVersion node) succ
-          lift $ writeSTRef (nodeVal node) newVal
-          let newDirtyConstraints = Set.delete constraintID $ nodeConstraints node
-          lift $ modifySTRef' dirtyConstraints (`Set.union` newDirtyConstraints)
+          oldVal <- lift $ readSTRef $ nodeVal node
+          if oldVal /= newVal
+          then do
+            lift $ modifySTRef' (nodeVersion node) succ
+            lift $ writeSTRef (nodeVal node) newVal
+            let newDirtyConstraints = Set.delete constraintID $ nodeConstraints node
+            lift $ modifySTRef' dirtyConstraints (`Set.union` newDirtyConstraints)
+          else
+            return ()
 
     whileM (fmap (not . Set.null) $ lift $ readSTRef dirtyConstraints) $ do
       nextConstraint <- fmap Set.findMin $ lift $ readSTRef dirtyConstraints

@@ -7,6 +7,7 @@ import qualified PosetSubsetSessionTests
 import qualified TopoSortTests
 import qualified UnifyTests
 import qualified PropagateTests
+import qualified TypeInferTests
 
 import Test.Hspec
 
@@ -20,3 +21,4 @@ main = hspec $ do
     TopoSortTests.test
     UnifyTests.test
     PropagateTests.test
+    TypeInferTests.test
