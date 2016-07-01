@@ -64,6 +64,7 @@ data Unifier err bound = Unifier
 data TypeError err atom
   = AtomError err
   | StructureMismatch (Type atom) (Type atom)
+  deriving (Eq, Ord, Show)
 
 dup :: (a -> a -> b) -> a -> b
 dup f x = f x x

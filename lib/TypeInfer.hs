@@ -15,14 +15,15 @@ import Control.Monad (foldM, join)
 import Data.Maybe (fromMaybe)
 import Data.Bifunctor (first, second)
 
-data Relation = Equality | Inequality Inequality deriving (Eq)
+data Relation = Equality | Inequality Inequality deriving (Eq, Ord, Show)
 
-data Formulation = AppOf | FuncOf | TupleOf
+data Formulation = AppOf | FuncOf | TupleOf deriving (Eq, Ord, Show)
 
 data Constraint var atom
   = BoundConstraint var (Type atom)
   | RelationConstraint var Relation var
   | FormulationConstraint var Formulation var var
+  deriving (Eq, Ord, Show)
 
 data InferenceError var err atom
   = InferenceError
@@ -30,6 +31,7 @@ data InferenceError var err atom
     , errorContent :: TypeError err atom
     }
   | FormMismatch var Formulation (Maybe (Type atom))
+  deriving (Eq, Ord, Show)
 
 data Problem var err atom = Problem
   { problemConstraints :: [Constraint var atom]
