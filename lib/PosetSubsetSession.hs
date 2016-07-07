@@ -114,6 +114,25 @@ data Subset (form :: SubsetForm) (s :: *) (a :: *)
   | SolitarySubset a
   | FamilialSubset (Poset a) Family IndexSet
 
+data ComparisonSubset a
+  = UniversalComparisonSubset
+  | TrivialComparisonSubset
+  | SolitaryComparisonSubset a
+  | FamilialComparisonSubset Family IndexSet
+  deriving (Eq, Ord)
+
+toComparisonSubset :: Subset form s a -> ComparisonSubset a
+toComparisonSubset Universal = UniversalComparisonSubset
+toComparisonSubset Trivial = TrivialComparisonSubset
+toComparisonSubset (SolitarySubset x) = SolitaryComparisonSubset x
+toComparisonSubset (FamilialSubset _ f i) = FamilialComparisonSubset f i
+
+instance (Eq a) => Eq (Subset form s a) where
+  a == b = toComparisonSubset a == toComparisonSubset b
+
+instance (Ord a) => Ord (Subset form s a) where
+  compare a b = compare (toComparisonSubset a) (toComparisonSubset b)
+
 -- Smart constructor to handle case of empty index set.
 -- not strictly necessary, but may have some performance benefits,
 -- and may improve error messages in the type inference engine.
