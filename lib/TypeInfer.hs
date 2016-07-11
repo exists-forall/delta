@@ -17,12 +17,13 @@ import Data.Bifunctor (first, second)
 
 data Relation = Equality | Inequality Inequality deriving (Eq, Ord, Show)
 
-data Formulation = AppOf | FuncOf | TupleOf deriving (Eq, Ord, Show)
+data Formulation = AppOf | TupleOf deriving (Eq, Ord, Show)
 
 data Constraint var atom
   = BoundConstraint var (Type atom)
   | RelationConstraint var Relation var
   | FormulationConstraint var Formulation var var
+  | FuncConstraint var (var, var)
   deriving (Eq, Ord, Show)
 
 data InferenceError var err atom
@@ -31,6 +32,7 @@ data InferenceError var err atom
     , errorContent :: TypeError err atom
     }
   | FormMismatch var Formulation (Maybe (Type atom))
+  | NotFunction var (Maybe (Type atom))
   deriving (Eq, Ord, Show)
 
 data Problem var err atom = Problem
@@ -44,10 +46,11 @@ data ConsolidatedConstraints var err atom = ConsolidatedConstraints
   { boundConstraints :: Map var (Type atom)
   , relationConstraints :: Map (OrderedPair var) Relation
   , formulationConstraints :: [(var, Formulation, var, var)]
+  , funcConstraints :: [(var, (var, var))]
   }
 
 emptyConstraints :: ConsolidatedConstraints var err atom
-emptyConstraints = ConsolidatedConstraints Map.empty Map.empty []
+emptyConstraints = ConsolidatedConstraints Map.empty Map.empty [] []
 
 relationConjunction :: Relation -> Relation -> Relation
 relationConjunction r1 r2 =
@@ -56,16 +59,24 @@ relationConjunction r1 r2 =
     else Equality
 
 splitFormulation :: Formulation -> Maybe (Type atom) -> Maybe (Maybe (Type atom), Maybe (Type atom))
+
 splitFormulation AppOf (Just (App appHead param)) = Just (appHead, param)
-splitFormulation FuncOf (Just (Func arg ret)) = Just (arg, ret)
-splitFormulation TupleOf (Just (Tuple tupleFst tupleSnd)) = Just (tupleFst, tupleSnd)
+splitFormulation AppOf (Just Never) = Just (Just Never, Nothing)
+
+splitFormulation TupleOf (Just (Tuple _ tupleFst tupleSnd)) = Just (tupleFst, tupleSnd)
+splitFormulation TupleOf (Just Never) = Just (Nothing, Nothing)
+
 splitFormulation _ (Just _) = Nothing
 splitFormulation _ Nothing = Just (Nothing, Nothing)
 
 joinFormulation :: Formulation -> (Maybe (Type atom), Maybe (Type atom)) -> Maybe (Type atom)
 joinFormulation AppOf = Just . uncurry App
-joinFormulation FuncOf = Just . uncurry Func
-joinFormulation TupleOf = Just . uncurry Tuple
+joinFormulation TupleOf = Just . uncurry (Tuple (SpecialBounds True True))
+
+funcComponents :: Maybe (Type atom) -> Maybe (SpecialBounds, Maybe (Type atom), Maybe (Type atom))
+funcComponents Nothing = Just (SpecialBounds False False, Nothing, Nothing)
+funcComponents (Just (Func sBounds arg ret)) = Just (sBounds, arg, ret)
+funcComponents (Just _) = Nothing
 
 markError :: Constraint var atom -> Either (TypeError err atom) a -> Either (InferenceError var err atom) a
 markError constraint = first (InferenceError constraint)
@@ -108,6 +119,13 @@ solve problem = do
         newFormulations = (var1, form, var2, var3) : oldFormulations
       in
         Right constraints { formulationConstraints = newFormulations }
+
+    includeConstraint constraints (FuncConstraint var1 (var2, var3)) =
+      let
+        oldFuncConstraints = funcConstraints constraints
+        newFuncConstraints = (var1, (var2, var3)) : oldFuncConstraints
+      in
+        Right constraints { funcConstraints = newFuncConstraints }
 
     enforceRelation ::
       (var, var) ->
@@ -185,6 +203,39 @@ solve problem = do
                 else []
           return $ wholeUpdate ++ boundUpdates
 
+    -- Currently largely redundant with formulation constraints, but will need to be treated
+    -- separately when interactions are implemented, so we may as well just separate it now.
+    enforceFuncConstraint ::
+      (var, (var, var)) ->
+      Prop.ConstraintEnforcer
+        var
+        (Maybe (Type atom))
+        (InferenceError var err atom)
+
+    enforceFuncConstraint (funcVar, (argVar, retVar)) =
+      go <$> queryVar funcVar <*> queryVar argVar <*> queryVar retVar where
+        constraint = FuncConstraint funcVar (argVar, retVar)
+        go (_, Unchanged) (_, Unchanged) (_, Unchanged) = Right []
+        go (funcBound, funcChange) (bound1, change1) (bound2, change2) = do
+          (_, part1, part2) <- case funcComponents funcBound of
+            Just components -> Right components
+            Nothing -> Left $ NotFunction funcVar funcBound
+          (part1', bound1') <- markError constraint $
+            enforceEQ (part1, funcChange) (bound1, change1)
+          (part2', bound2') <- markError constraint $
+            enforceEQ (part2, funcChange) (bound2, change2)
+          let
+            newFunc = Just $ Func (SpecialBounds True True) part1' part2'
+            funcUpdate =
+              if change1 == Changed || change2 == Changed
+                then [(funcVar, newFunc)]
+                else []
+            boundUpdates =
+              if funcChange == Changed
+                then [(argVar, bound1'), (retVar, bound2')]
+                else []
+          return $ funcUpdate ++ boundUpdates
+
   allConstraints <- foldM includeConstraint emptyConstraints (problemConstraints problem)
 
   let
@@ -194,9 +245,12 @@ solve problem = do
 
     formulationEnforcers = map enforceFormulation $ formulationConstraints allConstraints
 
+    funcEnforcers = map enforceFuncConstraint $ funcConstraints allConstraints
+
     allEnforcers = concat
       [ relationEnforcers
       , formulationEnforcers
+      , funcEnforcers
       -- don't forget to add new enforcer types here!
       ]
 

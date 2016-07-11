@@ -2,6 +2,7 @@
 
 module Unify
   ( Type (..)
+  , SpecialBounds (..)
   , Inequality (..)
   , TypeError (..)
 
@@ -17,6 +18,8 @@ where
 import Data.Tuple (swap)
 import Control.Applicative ((<|>))
 
+import Data.Maybe (fromJust)
+
 data Inequality = LTE | GTE deriving (Eq, Ord, Show)
 
 flipInequality :: Inequality -> Inequality
@@ -29,15 +32,68 @@ flipInequality GTE = LTE
 data Type atom
   = Atom atom
   | App (Maybe (Type atom)) (Maybe (Type atom))
-  | Func (Maybe (Type atom)) (Maybe (Type atom))
-  | Tuple (Maybe (Type atom)) (Maybe (Type atom))
+  | Func SpecialBounds (Maybe (Type atom)) (Maybe (Type atom))
+  | Tuple SpecialBounds (Maybe (Type atom)) (Maybe (Type atom))
+  | Never
   deriving (Eq, Ord, Show)
+
+{- Conceptually, a function type bound is very much like a type application bound in which the type
+constructor is the special (->) atom.  Function type bounds are not coercible to or directly
+compatible with type application bounds, but they nonetheless share the property that their type
+constructor itself has an upper and lower bound during type inference.  Like all other types, the
+conceptual (->) atom is a supertype of the special bot (⊥) type, and a subtype of the special top (⊤)
+type.
+
+
+Therefore, if type variable `t` is a function type bound and conceptually `t = c<a><b>`, there are
+actually four subtly distinct possibilities:
+
+1. (->) ≤ c ≤ (->)
+2. ⊥ ≤ c ≤ (->)
+3. (->) ≤ c ≤ ⊤
+4. ⊥ ≤ c ≤ ⊤
+
+While the difference between these scenarios may seem irrelevant, it becomes important when unifying
+function types with ⊥ (the bottom type, written `Never` in Delta code).  If we have the constraint
+`t ≤ ⊥`, scenarios #2 and #4 admit the solution `c = ⊥`, whereas scenarios #1 and #3 admit no
+solution. Additionally, while scenario #4 may seem odd in that it does not actually constrain the
+type to be a function at all (although it does forbid it from being a type application or tuple), it
+can be important as an intermediate step during unification.  For example, if `u` is initially
+completely unconstrained, and we apply the constraint that `u ≤ t` where the bound of `t` is a
+function bound corresponding to scenario #3, then `u` enters scenario #4.
+
+All the above logic also applies to Tuple types and the special (,) pseudo-type-constructor.
+
+The `SpecialBounds` type distinguishes between these four possibilities for functions and tuples.
+-}
+data SpecialBounds = SpecialBounds
+  { constrainedLo :: Bool
+  , constrainedHi :: Bool
+  }
+  deriving (Eq, Ord, Show)
+
+specialBoundsEQ :: SpecialBounds -> SpecialBounds -> SpecialBounds
+specialBoundsEQ (SpecialBounds lo1 hi1) (SpecialBounds lo2 hi2) = SpecialBounds (lo1 || lo2) (hi1 || hi2)
+
+specialBoundsLTE :: SpecialBounds -> SpecialBounds -> (SpecialBounds, SpecialBounds)
+specialBoundsLTE (SpecialBounds lo1 hi1) (SpecialBounds lo2 hi2) =
+  (SpecialBounds lo1 (hi1 || hi2), SpecialBounds (lo1 || lo2) hi2)
+
+specialBoundsAsym :: Inequality -> SpecialBounds -> SpecialBounds -> SpecialBounds
+specialBoundsAsym LTE (SpecialBounds lo1 _) (SpecialBounds lo2 hi2) = SpecialBounds (lo1 || lo2) hi2
+specialBoundsAsym GTE (SpecialBounds _ hi1) (SpecialBounds lo2 hi2) = SpecialBounds lo2 (hi1 || hi2)
 
 data TypePair atom
   = TwoAtoms (Maybe atom) (Maybe atom)
   | TwoApps (Maybe (Type atom), Maybe (Type atom)) (Maybe (Type atom), Maybe (Type atom))
-  | TwoFuncs (Maybe (Type atom), Maybe (Type atom)) (Maybe (Type atom), Maybe (Type atom))
-  | TwoTuples (Maybe (Type atom), Maybe (Type atom)) (Maybe (Type atom), Maybe (Type atom))
+  | TwoFuncs
+    (SpecialBounds, Maybe (Type atom), Maybe (Type atom))
+    (SpecialBounds, Maybe (Type atom), Maybe (Type atom))
+  | TwoTuples
+    (SpecialBounds, Maybe (Type atom), Maybe (Type atom))
+    (SpecialBounds, Maybe (Type atom), Maybe (Type atom))
+  | NeverAndType (Maybe (Type atom))
+  | TypeAndNever (Maybe (Type atom))
 
 -- Unifies two bounds related by an equality constraint.
 -- Because the constraint is an equality constraint, unification must result in both bounds
@@ -59,11 +115,13 @@ data Unifier err bound = Unifier
   { unifyEQ :: EQUnifier err bound
   , unifyLTE :: LTEUnifier err bound
   , unifyAsym :: AsymUnifier err bound
+  , hasLowerBound :: Maybe bound -> Bool
   }
 
 data TypeError err atom
   = AtomError err
   | StructureMismatch (Type atom) (Type atom)
+  | NotNeverConvertible (Type atom)
   deriving (Eq, Ord, Show)
 
 dup :: (a -> a -> b) -> a -> b
@@ -83,6 +141,9 @@ structureUnify :: Maybe (Type atom) -> Maybe (Type atom) -> Either (TypeError er
 
 structureUnify Nothing Nothing = Right Nothing
 
+structureUnify (Just Never) t = Right (Just (NeverAndType t))
+structureUnify t (Just Never) = Right (Just (TypeAndNever t))
+
 structureUnify (Just (Atom atom1)) (Just (Atom atom2)) = Right (Just (TwoAtoms (Just atom1) (Just atom2)))
 structureUnify (Just (Atom atom1)) Nothing = Right (Just (TwoAtoms (Just atom1) Nothing))
 structureUnify Nothing (Just (Atom atom2)) = Right (Just (TwoAtoms Nothing (Just atom2)))
@@ -91,13 +152,23 @@ structureUnify (Just (App head1 param1)) (Just (App head2 param2)) = Right (Just
 structureUnify (Just (App head1 param1)) Nothing = Right (Just (TwoApps (head1, param1) (Nothing, Nothing)))
 structureUnify Nothing (Just (App head2 param2)) = Right (Just (TwoApps (Nothing, Nothing) (head2, param2)))
 
-structureUnify (Just (Func arg1 ret1)) (Just (Func arg2 ret2)) = Right (Just (TwoFuncs (arg1, ret1) (arg2, ret2)))
-structureUnify (Just (Func arg1 ret1)) Nothing = Right (Just (TwoFuncs (arg1, ret1) (Nothing, Nothing)))
-structureUnify Nothing (Just (Func arg2 ret2)) = Right (Just (TwoFuncs (Nothing, Nothing) (arg2, ret2)))
+structureUnify (Just (Func sBounds1 arg1 ret1)) (Just (Func sBounds2 arg2 ret2)) =
+  Right (Just (TwoFuncs (sBounds1, arg1, ret1) (sBounds2, arg2, ret2)))
 
-structureUnify (Just (Tuple fst1 snd1)) (Just (Tuple fst2 snd2)) = Right (Just (TwoTuples (fst1, snd1) (fst2, snd2)))
-structureUnify (Just (Tuple fst1 snd1)) Nothing = Right (Just (TwoTuples (fst1, snd1) (Nothing, Nothing)))
-structureUnify Nothing (Just (Tuple fst2 snd2)) = Right (Just (TwoTuples (Nothing, Nothing) (fst2, snd2)))
+structureUnify (Just (Func sBounds1 arg1 ret1)) Nothing =
+  Right (Just (TwoFuncs (sBounds1, arg1, ret1) (SpecialBounds False False, Nothing, Nothing)))
+
+structureUnify Nothing (Just (Func sBounds2 arg2 ret2)) =
+  Right (Just (TwoFuncs (SpecialBounds False False, Nothing, Nothing) (sBounds2, arg2, ret2)))
+
+structureUnify (Just (Tuple sBounds1 fst1 snd1)) (Just (Tuple sBounds2 fst2 snd2)) =
+  Right (Just (TwoTuples (sBounds1, fst1, snd1) (sBounds2, fst2, snd2)))
+
+structureUnify (Just (Tuple sBounds1 fst1 snd1)) Nothing =
+  Right (Just (TwoTuples (sBounds1, fst1, snd1) (SpecialBounds False False, Nothing, Nothing)))
+
+structureUnify Nothing (Just (Tuple sBounds2 fst2 snd2)) =
+  Right (Just (TwoTuples (SpecialBounds False False, Nothing, Nothing) (sBounds2, fst2, snd2)))
 
 structureUnify (Just bound1) (Just bound2) = Left (StructureMismatch bound1 bound2)
 
@@ -115,15 +186,24 @@ liftAtomUnifier atomUnifier =
           paramBound <- typeUnifyEQ param1 param2
           return (Just (App headBound paramBound))
 
-        (Func arg1 ret1, Func arg2 ret2) -> do
+        (Func sBounds1 arg1 ret1, Func sBounds2 arg2 ret2) -> do
+          let sBounds = specialBoundsEQ sBounds1 sBounds2
           arg <- typeUnifyEQ arg1 arg2
           ret <- typeUnifyEQ ret1 ret2
-          return (Just (Func arg ret))
+          return (Just (Func sBounds arg ret))
 
-        (Tuple fst1 snd1, Tuple fst2 snd2) -> do
+        (Tuple sBounds1 fst1 snd1, Tuple sBounds2 fst2 snd2) -> do
+          let sBounds = specialBoundsEQ sBounds1 sBounds2
           fstBound <- typeUnifyEQ fst1 fst2
           sndBound <- typeUnifyEQ snd1 snd2
-          return (Just (Tuple fstBound sndBound))
+          return (Just (Tuple sBounds fstBound sndBound))
+
+        (Never, Never) -> Right (Just Never)
+        (t, Never) ->
+          if lowerBound $ Just t
+            then Left $ NotNeverConvertible t
+            else Right $ Just Never
+        (Never, t) -> typeUnifyEQ (Just t) (Just Never)
 
         (_, _) -> Left (StructureMismatch bound1 bound2)
 
@@ -141,22 +221,29 @@ liftAtomUnifier atomUnifier =
           (param1', param2') <- fmap (dup (,)) (typeUnifyEQ param1 param2) -- type constructors are invariant in their type parameter
           return (Just (App head1' param1'), Just (App head2' param2'))
 
-        Just (TwoFuncs (arg1, ret1) (arg2, ret2)) -> do
+        Just (TwoFuncs (sBounds1, arg1, ret1) (sBounds2, arg2, ret2)) -> do
+          let (sBounds1', sBounds2') = specialBoundsLTE sBounds1 sBounds2
           (arg1', arg2') <- fmap swap (typeUnifyLTE arg2 arg1) -- functions are contravariant in their argument
           (ret1', ret2') <- typeUnifyLTE ret1 ret2
-          return (Just (Func arg1' ret1'), Just (Func arg2' ret2'))
+          return (Just (Func sBounds1' arg1' ret1'), Just (Func sBounds2' arg2' ret2'))
 
-        Just (TwoTuples (fst1, snd1) (fst2, snd2)) -> do
+        Just (TwoTuples (sBounds1, fst1, snd1) (sBounds2, fst2, snd2)) -> do
+          let (sBounds1', sBounds2') = specialBoundsLTE sBounds1 sBounds2
           (fst1', fst2') <- typeUnifyLTE fst1 fst2
           (snd1', snd2') <- typeUnifyLTE snd1 snd2
-          return (Just (Tuple fst1' snd1'), Just (Tuple fst2' snd2'))
+          return (Just (Tuple sBounds1' fst1' snd1'), Just (Tuple sBounds2' fst2' snd2'))
+
+        Just (NeverAndType _) -> Right (bound1, bound2) -- `∀ τ. ⊥ ≤ τ`, so do nothing
+        Just (TypeAndNever t) ->
+          if lowerBound t
+            then Left $ NotNeverConvertible $ fromJust t -- lowerBound is False for Nothing
+            else Right $ (Just Never, Just Never)
 
         Nothing -> return (Nothing, Nothing)
 
     typeUnifyAsym :: AsymUnifier (TypeError err atom) (Type atom)
     typeUnifyAsym inequality bound1 bound2 = do
       bounds <- structureUnify bound1 bound2
-      -- structureUnify will never return "Right Nothing" if one of its arguments is a "Just"
       case bounds of
         Just (TwoAtoms atom1 atom2) ->
           mapEither AtomError (fmap Atom) (unifyAsym atomUnifier inequality atom1 atom2)
@@ -165,20 +252,55 @@ liftAtomUnifier atomUnifier =
           head2' <- typeUnifyAsym inequality head1 head2
           return (Just (App head2' param1))
 
-        Just (TwoFuncs (arg1, ret1) (arg2, ret2)) -> do
+        Just (TwoFuncs (sBounds1, arg1, ret1) (sBounds2, arg2, ret2)) -> do
+          let sBounds2' = specialBoundsAsym inequality sBounds1 sBounds2
           arg2' <- typeUnifyAsym (flipInequality inequality) arg1 arg2
           ret2' <- typeUnifyAsym inequality ret1 ret2
-          return (Just (Func arg2' ret2'))
+          return (Just (Func sBounds2' arg2' ret2'))
 
-        Just (TwoTuples (fst1, snd1) (fst2, snd2)) -> do
+        Just (TwoTuples (sBounds1, fst1, snd1) (sBounds2, fst2, snd2)) -> do
+          let sBounds2' = specialBoundsAsym inequality sBounds1 sBounds2
           fst2' <- typeUnifyAsym inequality fst1 fst2
           snd2' <- typeUnifyAsym inequality snd1 snd2
-          return (Just (Tuple fst2' snd2'))
+          return (Just (Tuple sBounds2' fst2' snd2'))
+
+        Just (NeverAndType t) ->
+          case inequality of
+            LTE -> Right t
+            GTE -> if lowerBound t
+              then Left $ NotNeverConvertible $ fromJust t
+              else Right $ Just Never
+
+        Just (TypeAndNever t) ->
+          case inequality of
+            GTE -> Right t
+            LTE -> if lowerBound t
+              then Left $ NotNeverConvertible $ fromJust t
+              else Right $ Just Never
 
         Nothing -> Right Nothing
+
+    lowerBound :: Maybe (Type atom) -> Bool
+
+    lowerBound Nothing = False
+
+    lowerBound (Just (Atom atom)) =
+      hasLowerBound atomUnifier (Just atom)
+
+    lowerBound (Just (App headBound _)) =
+      lowerBound headBound
+
+    lowerBound (Just (Func sBounds _ _)) =
+      constrainedLo sBounds
+
+    lowerBound (Just (Tuple sBounds _ _)) =
+      constrainedLo sBounds
+
+    lowerBound (Just Never) = False
   in
     Unifier
       { unifyEQ = typeUnifyEQ
       , unifyLTE = typeUnifyLTE
       , unifyAsym = typeUnifyAsym
+      , hasLowerBound = lowerBound
       }
