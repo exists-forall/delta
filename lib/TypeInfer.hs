@@ -190,27 +190,48 @@ solve problem = do
         (InferenceError var err atom)
 
     enforceFormulation (wholeVar, form, var1, var2) =
-      go <$> queryVar wholeVar <*> queryVar var1 <*> queryVar var2 where
-        constraint = FormulationConstraint wholeVar form var1 var2
-        go (_, Unchanged) (_, Unchanged) (_, Unchanged) = Right []
-        go (wholeBound, wholeChange) (bound1, change1) (bound2, change2) = do
-          (part1, part2) <- case splitFormulation form wholeBound of
-            Just parts -> Right parts
-            Nothing -> Left $ FormMismatch wholeVar form wholeBound
-          (part1', bound1') <- markError constraint $
-            enforceEQ (part1, wholeChange) (bound1, change1)
-          (part2', bound2') <- markError constraint $
-            enforceEQ (part2, wholeChange) (bound2, change2)
-          let
-            wholeUpdate =
-              if change1 == Changed || change2 == Changed
-                then [(wholeVar, joinFormulation form (part1', part2'))]
-                else []
-            boundUpdates =
-              if wholeChange == Changed
-                then [(var1, bound1'), (var2, bound2')]
-                else []
-          return $ wholeUpdate ++ boundUpdates
+      {- Special handling is required when var1 == var2.  See the comments on enforceFuncConstraint
+      for more information and explanation.
+      -}
+      if var1 /= var2
+        then let
+          constraint = FormulationConstraint wholeVar form var1 var2
+          go (_, Unchanged) (_, Unchanged) (_, Unchanged) = Right []
+          go (wholeBound, wholeChange) (bound1, change1) (bound2, change2) = do
+            (part1, part2) <- case splitFormulation form wholeBound of
+              Just parts -> Right parts
+              Nothing -> Left $ FormMismatch wholeVar form wholeBound
+            (part1', bound1') <- markError constraint $
+              enforceEQ (part1, wholeChange) (bound1, change1)
+            (part2', bound2') <- markError constraint $
+              enforceEQ (part2, wholeChange) (bound2, change2)
+            let
+              wholeUpdate =
+                if change1 == Changed || change2 == Changed
+                  then [(wholeVar, joinFormulation form (part1', part2'))]
+                  else []
+              boundUpdates =
+                if wholeChange == Changed
+                  then [(var1, bound1'), (var2, bound2')]
+                  else []
+            return $ wholeUpdate ++ boundUpdates
+          in
+            go <$> queryVar wholeVar <*> queryVar var1 <*> queryVar var2
+        else let
+          constraint = FormulationConstraint wholeVar form var1 var2
+          go (_, Unchanged) (_, Unchanged) = Right []
+          go (wholeBound, _) (bound, _) = do
+            -- Here we ignore change information.  See enforceFuncConstraint for more details.
+            (part1, part2) <- case splitFormulation form wholeBound of
+              Just parts -> Right parts
+              Nothing -> Left $ FormMismatch wholeVar form wholeBound
+            bound'1 <- markError constraint $ unifyEQ unifier part1 bound
+            bound'2 <- markError constraint $ unifyEQ unifier part2 bound
+            bound' <- markError constraint $ unifyEQ unifier bound'1 bound'2
+            let newWhole = joinFormulation form (bound', bound')
+            return [(wholeVar, newWhole), (var1, bound')]
+          in
+            go <$> queryVar wholeVar <*> queryVar var1
 
     -- Currently largely redundant with formulation constraints, but will need to be treated
     -- separately when interactions are implemented, so we may as well just separate it now.
@@ -222,28 +243,66 @@ solve problem = do
         (InferenceError var err atom)
 
     enforceFuncConstraint (funcVar, (argVar, retVar)) =
-      go <$> queryVar funcVar <*> queryVar argVar <*> queryVar retVar where
-        constraint = FuncConstraint funcVar (argVar, retVar)
-        go (_, Unchanged) (_, Unchanged) (_, Unchanged) = Right []
-        go (funcBound, funcChange) (bound1, change1) (bound2, change2) = do
-          (_, part1, part2) <- case funcComponents funcBound of
-            Just components -> Right components
-            Nothing -> Left $ NotFunction funcVar funcBound
-          (part1', bound1') <- markError constraint $
-            enforceEQ (part1, funcChange) (bound1, change1)
-          (part2', bound2') <- markError constraint $
-            enforceEQ (part2, funcChange) (bound2, change2)
-          let
-            newFunc = Just $ Func (SpecialBounds True True) part1' part2'
-            funcUpdate =
-              if change1 == Changed || change2 == Changed
-                then [(funcVar, newFunc)]
-                else []
-            boundUpdates =
-              if funcChange == Changed
-                then [(argVar, bound1'), (retVar, bound2')]
-                else []
-          return $ funcUpdate ++ boundUpdates
+      {-
+      NOTE: Special handling is required to handle the case where argVar == retVar. Ignoring the
+      need for this special handling results in a subtle bug in which the new value for argVar is
+      overwritten with the new value for retVar (which may be different, since the local unifier
+      doesn't know that these type variables happen to be the same).  Because this is a raw
+      overwrite, not an equality unification step, information from the argVar unification step can
+      be erased.
+
+      TODO: There should be some way to prevent such bugs from being introduced in the future;
+      perhaps a runtime warning in Propagate if it sees two simultaneous overwrites of the same
+      variable?
+      -}
+      if argVar /= retVar
+        then let
+            constraint = FuncConstraint funcVar (argVar, retVar)
+            go (_, Unchanged) (_, Unchanged) (_, Unchanged) = Right []
+            go (funcBound, funcChange) (bound1, change1) (bound2, change2) = do
+              (_, part1, part2) <- case funcComponents funcBound of
+                Just components -> Right components
+                Nothing -> Left $ NotFunction funcVar funcBound
+              (part1', bound1') <- markError constraint $
+                enforceEQ (part1, funcChange) (bound1, change1)
+              (part2', bound2') <- markError constraint $
+                enforceEQ (part2, funcChange) (bound2, change2)
+              let
+                newFunc = Just $ Func (SpecialBounds True True) part1' part2'
+                funcUpdate =
+                  if change1 == Changed || change2 == Changed
+                    then [(funcVar, newFunc)]
+                    else []
+                boundUpdates =
+                  if funcChange == Changed
+                    then [(argVar, bound1'), (retVar, bound2')]
+                    else []
+              return $ funcUpdate ++ boundUpdates
+          in
+            go <$> queryVar funcVar <*> queryVar argVar <*> queryVar retVar
+        else let
+            constraint = FuncConstraint funcVar (argVar, retVar)
+            go (_, Unchanged) (_, Unchanged) = Right []
+            go (funcBound, _) (bound, _) = do
+              {- Here we conservatively ignore any change information. In theory we could get
+              performance gains by exploiting this information, as we do in most enforcers. However,
+              because of the three-way equality between the two parts of the function bound and the
+              one arg/ret bound, and the inability to know which part of the function bounds
+              changed, using change information here is somewhat annoying, and the benefits are
+              smaller than usual.  Moreover, the special case of `f = a -> a` doesn't come up that
+              often.  We should probably fix this branch to use change information at some point,
+              but it's a low-priority nice-to-have.
+              -}
+              (_, part1, part2) <- case funcComponents funcBound of
+                Just components -> Right components
+                Nothing -> Left $ NotFunction funcVar funcBound
+              bound'1 <- markError constraint $ unifyEQ unifier part1 bound
+              bound'2 <- markError constraint $ unifyEQ unifier part2 bound
+              bound' <- markError constraint $ unifyEQ unifier bound'1 bound'2
+              let newFunc = Just $ Func (SpecialBounds True True) bound' bound'
+              return [(funcVar, newFunc), (argVar, bound')]
+          in
+            go <$> queryVar funcVar <*> queryVar argVar
 
   allConstraints <- foldM includeConstraint emptyConstraints (problemConstraints problem)
 
