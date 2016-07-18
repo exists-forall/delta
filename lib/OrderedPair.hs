@@ -4,6 +4,8 @@
 module OrderedPair
   ( OrderedPair -- note that constructor is *not* exported
   , orderedPair
+  , orderedPair'
+  , Flipped (..)
   , items
   )
 where
@@ -15,6 +17,14 @@ orderedPair x y =
   if x < y
     then OrderedPair x y
     else OrderedPair y x
+
+data Flipped = DidFlip | DidNotFlip
+
+orderedPair' :: (Ord a) => a -> a -> (OrderedPair a, Flipped)
+orderedPair' x y =
+  if x < y
+    then (OrderedPair x y, DidNotFlip)
+    else (OrderedPair y x, DidFlip)
 
 items :: OrderedPair a -> (a, a)
 items (OrderedPair x y) = (x, y)

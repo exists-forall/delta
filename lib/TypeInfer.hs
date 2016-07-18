@@ -58,6 +58,11 @@ relationConjunction r1 r2 =
     then r1
     else Equality
 
+flipRelation :: Relation -> Relation
+flipRelation Equality = Equality
+flipRelation (Inequality LTE) = Inequality GTE
+flipRelation (Inequality GTE) = Inequality LTE
+
 splitFormulation :: Formulation -> Maybe (Type atom) -> Maybe (Maybe (Type atom), Maybe (Type atom))
 
 splitFormulation AppOf (Just (App appHead param)) = Just (appHead, param)
@@ -107,9 +112,13 @@ solve problem = do
     includeConstraint constraints (RelationConstraint var1 rel var2) =
       let
         oldRelations = relationConstraints constraints
-        oldRelation = Map.lookup (orderedPair var1 var2) oldRelations
-        newRelation = fromMaybe rel $ fmap (relationConjunction rel) oldRelation
-        newRelations = Map.insert (orderedPair var1 var2) newRelation oldRelations
+        (ordered, flipped) = orderedPair' var1 var2
+        normalizedRel = case flipped of
+          DidNotFlip -> rel
+          DidFlip -> flipRelation rel
+        oldRelation = Map.lookup ordered oldRelations
+        newRelation = fromMaybe normalizedRel $ fmap (relationConjunction normalizedRel) oldRelation
+        newRelations = Map.insert ordered newRelation oldRelations
       in
         Right constraints { relationConstraints = newRelations }
 
