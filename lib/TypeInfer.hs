@@ -7,11 +7,13 @@ import Propagate (queryVar, ChangeStatus(..))
 
 import Unify
 import OrderedPair
+import DirectedGraph
+import TopoSort
 
 import qualified Data.Map as Map
 import Data.Map (Map)
 
-import Control.Monad (foldM, join)
+import Control.Monad (foldM, join, when)
 import Data.Maybe (fromMaybe)
 import Data.Bifunctor (first, second)
 
@@ -33,6 +35,7 @@ data InferenceError var err atom
     }
   | FormMismatch var Formulation (Maybe (Type atom))
   | NotFunction var (Maybe (Type atom))
+  | RecursiveType -- This should probably have some useful data attached to it
   deriving (Eq, Ord, Show)
 
 data Problem var err atom = Problem
@@ -63,6 +66,34 @@ flipRelation Equality = Equality
 flipRelation (Inequality LTE) = Inequality GTE
 flipRelation (Inequality GTE) = Inequality LTE
 
+data StructuralSizeRelation var = var `StructurallyLargerThan` var
+
+structuralSizeRelations :: Constraint var atom -> [StructuralSizeRelation var]
+structuralSizeRelations (BoundConstraint _ _) = []
+structuralSizeRelations (RelationConstraint _ _ _) = []
+structuralSizeRelations (FormulationConstraint whole _ part1 part2) =
+  [ whole `StructurallyLargerThan` part1
+  , whole `StructurallyLargerThan` part2
+  ]
+structuralSizeRelations (FuncConstraint func (arg, ret)) =
+  [ func `StructurallyLargerThan` arg
+  , func `StructurallyLargerThan` ret
+  ]
+
+impliesIllegalRecursiveTypes :: (Ord var) => [Constraint var atom] -> Bool
+impliesIllegalRecursiveTypes constraints =
+  let
+    structuralRelations = concatMap structuralSizeRelations constraints
+    consolidatedStructuralRelations =
+      outgoingEdges $
+      buildDirectedGraph $
+      map
+        (\(a `StructurallyLargerThan` b) -> a `EdgeTo` b)
+        structuralRelations
+  in case topoSort consolidatedStructuralRelations of
+    Just _ -> False
+    Nothing -> True
+
 splitFormulation :: Formulation -> Maybe (Type atom) -> Maybe (Maybe (Type atom), Maybe (Type atom))
 
 splitFormulation AppOf (Just (App appHead param)) = Just (appHead, param)
@@ -92,6 +123,8 @@ insertMaybe k Nothing = Map.delete k
 
 solve :: forall var err atom. (Ord var, Eq atom) => Problem var err atom -> Solution var err atom
 solve problem = do
+  when (impliesIllegalRecursiveTypes (problemConstraints problem)) $ Left RecursiveType
+
   let
     unifier = liftAtomUnifier $ problemAtomUnifier problem
 
