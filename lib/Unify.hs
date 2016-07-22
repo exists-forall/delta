@@ -15,6 +15,12 @@ module Unify
   )
 where
 
+import qualified Data.Map as Map
+import Data.Map (Map)
+
+import qualified Data.Set as Set
+import Data.Set (Set)
+
 import Data.Tuple (swap)
 import Control.Applicative ((<|>))
 
@@ -29,11 +35,12 @@ flipInequality GTE = LTE
 -- Technically, these are "type bounds", not "types", and "atom"s are really "atomBound"s
 -- A "Type" conceptually involves both a lower and upper bound, which are both themselves "types"
 -- in the conventional sense.
-data Type atom
+data Type atom inter
   = Atom atom
-  | App (Maybe (Type atom)) (Maybe (Type atom))
-  | Func SpecialBounds (Maybe (Type atom)) (Maybe (Type atom))
-  | Tuple SpecialBounds (Maybe (Type atom)) (Maybe (Type atom))
+  | App (Maybe (Type atom inter)) (Maybe (Type atom inter))
+  | Func SpecialBounds (Maybe (Type atom inter)) (Maybe (Type atom inter))
+  | Tuple SpecialBounds (Maybe (Type atom inter)) (Maybe (Type atom inter))
+  | Interaction (Map inter [(Maybe (Type atom inter))]) (Maybe (Set inter))
   | Never
   deriving (Eq, Ord, Show)
 
@@ -83,17 +90,17 @@ specialBoundsAsym :: Inequality -> SpecialBounds -> SpecialBounds -> SpecialBoun
 specialBoundsAsym LTE (SpecialBounds lo1 _) (SpecialBounds lo2 hi2) = SpecialBounds (lo1 || lo2) hi2
 specialBoundsAsym GTE (SpecialBounds _ hi1) (SpecialBounds lo2 hi2) = SpecialBounds lo2 (hi1 || hi2)
 
-data TypePair atom
+data TypePair atom inter
   = TwoAtoms (Maybe atom) (Maybe atom)
-  | TwoApps (Maybe (Type atom), Maybe (Type atom)) (Maybe (Type atom), Maybe (Type atom))
+  | TwoApps (Maybe (Type atom inter), Maybe (Type atom inter)) (Maybe (Type atom inter), Maybe (Type atom inter))
   | TwoFuncs
-    (SpecialBounds, Maybe (Type atom), Maybe (Type atom))
-    (SpecialBounds, Maybe (Type atom), Maybe (Type atom))
+    (SpecialBounds, Maybe (Type atom inter), Maybe (Type atom inter))
+    (SpecialBounds, Maybe (Type atom inter), Maybe (Type atom inter))
   | TwoTuples
-    (SpecialBounds, Maybe (Type atom), Maybe (Type atom))
-    (SpecialBounds, Maybe (Type atom), Maybe (Type atom))
-  | NeverAndType (Maybe (Type atom))
-  | TypeAndNever (Maybe (Type atom))
+    (SpecialBounds, Maybe (Type atom inter), Maybe (Type atom inter))
+    (SpecialBounds, Maybe (Type atom inter), Maybe (Type atom inter))
+  | NeverAndType (Maybe (Type atom inter))
+  | TypeAndNever (Maybe (Type atom inter))
 
 -- Unifies two bounds related by an equality constraint.
 -- Because the constraint is an equality constraint, unification must result in both bounds
@@ -118,10 +125,10 @@ data Unifier err bound = Unifier
   , hasLowerBound :: Maybe bound -> Bool
   }
 
-data TypeError err atom
+data TypeError err atom inter
   = AtomError err
-  | StructureMismatch (Type atom) (Type atom)
-  | NotNeverConvertible (Type atom)
+  | StructureMismatch (Type atom inter) (Type atom inter)
+  | NotNeverConvertible (Type atom inter)
   deriving (Eq, Ord, Show)
 
 dup :: (a -> a -> b) -> a -> b
@@ -137,7 +144,10 @@ mapEither :: (l -> l') -> (r -> r') -> Either l r -> Either l' r'
 mapEither f _ (Left x) = Left (f x)
 mapEither _ g (Right y) = Right (g y)
 
-structureUnify :: Maybe (Type atom) -> Maybe (Type atom) -> Either (TypeError err atom) (Maybe (TypePair atom))
+structureUnify ::
+  Maybe (Type atom inter) ->
+  Maybe (Type atom inter) ->
+  Either (TypeError err atom inter) (Maybe (TypePair atom inter))
 
 structureUnify Nothing Nothing = Right Nothing
 
@@ -172,10 +182,10 @@ structureUnify Nothing (Just (Tuple sBounds2 fst2 snd2)) =
 
 structureUnify (Just bound1) (Just bound2) = Left (StructureMismatch bound1 bound2)
 
-liftAtomUnifier :: forall err atom. Unifier err atom -> Unifier (TypeError err atom) (Type atom)
+liftAtomUnifier :: forall err atom inter. (Ord inter) => Unifier err atom -> Unifier (TypeError err atom inter) (Type atom inter)
 liftAtomUnifier atomUnifier =
   let
-    typeUnifyEQ :: EQUnifier (TypeError err atom) (Type atom)
+    typeUnifyEQ :: EQUnifier (TypeError err atom inter) (Type atom inter)
     typeUnifyEQ (Just bound1) (Just bound2) =
       case (bound1, bound2) of
         (Atom atom1, Atom atom2) ->
@@ -209,7 +219,7 @@ liftAtomUnifier atomUnifier =
 
     typeUnifyEQ bound1 bound2 = Right (bound1 <|> bound2)
 
-    typeUnifyLTE :: LTEUnifier (TypeError err atom) (Type atom)
+    typeUnifyLTE :: LTEUnifier (TypeError err atom inter) (Type atom inter)
     typeUnifyLTE bound1 bound2 = do
       bounds <- structureUnify bound1 bound2
       case bounds of
@@ -241,7 +251,7 @@ liftAtomUnifier atomUnifier =
 
         Nothing -> return (Nothing, Nothing)
 
-    typeUnifyAsym :: AsymUnifier (TypeError err atom) (Type atom)
+    typeUnifyAsym :: AsymUnifier (TypeError err atom inter) (Type atom inter)
     typeUnifyAsym inequality bound1 bound2 = do
       bounds <- structureUnify bound1 bound2
       case bounds of
@@ -280,7 +290,7 @@ liftAtomUnifier atomUnifier =
 
         Nothing -> Right Nothing
 
-    lowerBound :: Maybe (Type atom) -> Bool
+    lowerBound :: Maybe (Type atom inter) -> Bool
 
     lowerBound Nothing = False
 

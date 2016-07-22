@@ -21,38 +21,38 @@ data Relation = Equality | Inequality Inequality deriving (Eq, Ord, Show)
 
 data Formulation = AppOf | TupleOf deriving (Eq, Ord, Show)
 
-data Constraint var atom
-  = BoundConstraint var (Type atom)
+data Constraint var atom inter
+  = BoundConstraint var (Type atom inter)
   | RelationConstraint var Relation var
   | FormulationConstraint var Formulation var var
   | FuncConstraint var (var, var)
   deriving (Eq, Ord, Show)
 
-data InferenceError var err atom
+data InferenceError var err atom inter
   = InferenceError
-    { errorConstraint :: Constraint var atom
-    , errorContent :: TypeError err atom
+    { errorConstraint :: Constraint var atom inter
+    , errorContent :: TypeError err atom inter
     }
-  | FormMismatch var Formulation (Maybe (Type atom))
-  | NotFunction var (Maybe (Type atom))
+  | FormMismatch var Formulation (Maybe (Type atom inter))
+  | NotFunction var (Maybe (Type atom inter))
   | RecursiveType -- This should probably have some useful data attached to it
   deriving (Eq, Ord, Show)
 
-data Problem var err atom = Problem
-  { problemConstraints :: [Constraint var atom]
+data Problem var err atom inter = Problem
+  { problemConstraints :: [Constraint var atom inter]
   , problemAtomUnifier :: Unifier err atom
   }
 
-type Solution var err atom = Either (InferenceError var err atom) (var -> Maybe (Type atom))
+type Solution var err atom inter = Either (InferenceError var err atom inter) (var -> Maybe (Type atom inter))
 
-data ConsolidatedConstraints var err atom = ConsolidatedConstraints
-  { boundConstraints :: Map var (Type atom)
+data ConsolidatedConstraints var err atom inter = ConsolidatedConstraints
+  { boundConstraints :: Map var (Type atom inter)
   , relationConstraints :: Map (OrderedPair var) Relation
   , formulationConstraints :: [(var, Formulation, var, var)]
   , funcConstraints :: [(var, (var, var))]
   }
 
-emptyConstraints :: ConsolidatedConstraints var err atom
+emptyConstraints :: ConsolidatedConstraints var err atom inter
 emptyConstraints = ConsolidatedConstraints Map.empty Map.empty [] []
 
 relationConjunction :: Relation -> Relation -> Relation
@@ -68,7 +68,7 @@ flipRelation (Inequality GTE) = Inequality LTE
 
 data StructuralSizeRelation var = var `StructurallyLargerThan` var
 
-structuralSizeRelations :: Constraint var atom -> [StructuralSizeRelation var]
+structuralSizeRelations :: Constraint var atom inter -> [StructuralSizeRelation var]
 structuralSizeRelations (BoundConstraint _ _) = []
 structuralSizeRelations (RelationConstraint _ _ _) = []
 structuralSizeRelations (FormulationConstraint whole _ part1 part2) =
@@ -80,7 +80,7 @@ structuralSizeRelations (FuncConstraint func (arg, ret)) =
   , func `StructurallyLargerThan` ret
   ]
 
-impliesIllegalRecursiveTypes :: (Ord var) => [Constraint var atom] -> Bool
+impliesIllegalRecursiveTypes :: (Ord var) => [Constraint var atom inter] -> Bool
 impliesIllegalRecursiveTypes constraints =
   let
     structuralRelations = concatMap structuralSizeRelations constraints
@@ -94,7 +94,7 @@ impliesIllegalRecursiveTypes constraints =
     Just _ -> False
     Nothing -> True
 
-splitFormulation :: Formulation -> Maybe (Type atom) -> Maybe (Maybe (Type atom), Maybe (Type atom))
+splitFormulation :: Formulation -> Maybe (Type atom inter) -> Maybe (Maybe (Type atom inter), Maybe (Type atom inter))
 
 splitFormulation AppOf (Just (App appHead param)) = Just (appHead, param)
 splitFormulation AppOf (Just Never) = Just (Just Never, Nothing)
@@ -105,23 +105,23 @@ splitFormulation TupleOf (Just Never) = Just (Nothing, Nothing)
 splitFormulation _ (Just _) = Nothing
 splitFormulation _ Nothing = Just (Nothing, Nothing)
 
-joinFormulation :: Formulation -> (Maybe (Type atom), Maybe (Type atom)) -> Maybe (Type atom)
+joinFormulation :: Formulation -> (Maybe (Type atom inter), Maybe (Type atom inter)) -> Maybe (Type atom inter)
 joinFormulation AppOf = Just . uncurry App
 joinFormulation TupleOf = Just . uncurry (Tuple (SpecialBounds True True))
 
-funcComponents :: Maybe (Type atom) -> Maybe (SpecialBounds, Maybe (Type atom), Maybe (Type atom))
+funcComponents :: Maybe (Type atom inter) -> Maybe (SpecialBounds, Maybe (Type atom inter), Maybe (Type atom inter))
 funcComponents Nothing = Just (SpecialBounds False False, Nothing, Nothing)
 funcComponents (Just (Func sBounds arg ret)) = Just (sBounds, arg, ret)
 funcComponents (Just _) = Nothing
 
-markError :: Constraint var atom -> Either (TypeError err atom) a -> Either (InferenceError var err atom) a
+markError :: Constraint var atom inter -> Either (TypeError err atom inter) a -> Either (InferenceError var err atom inter) a
 markError constraint = first (InferenceError constraint)
 
 insertMaybe :: (Ord k) => k -> Maybe a -> Map k a -> Map k a
 insertMaybe k (Just val) = Map.insert k val
 insertMaybe k Nothing = Map.delete k
 
-solve :: forall var err atom. (Ord var, Eq atom) => Problem var err atom -> Solution var err atom
+solve :: forall var err atom inter. (Ord var, Eq atom, Ord inter) => Problem var err atom inter -> Solution var err atom inter
 solve problem = do
   when (impliesIllegalRecursiveTypes (problemConstraints problem)) $ Left RecursiveType
 
@@ -129,11 +129,11 @@ solve problem = do
     unifier = liftAtomUnifier $ problemAtomUnifier problem
 
     includeConstraint ::
-      ConsolidatedConstraints var err atom ->
-      Constraint var atom ->
+      ConsolidatedConstraints var err atom inter ->
+      Constraint var atom inter ->
       Either
-        (InferenceError var err atom)
-        (ConsolidatedConstraints var err atom)
+        (InferenceError var err atom inter)
+        (ConsolidatedConstraints var err atom inter)
 
     includeConstraint constraints c@(BoundConstraint var bound) = do
       let oldBoundConstraints = boundConstraints constraints
@@ -174,8 +174,8 @@ solve problem = do
       Relation ->
       Prop.ConstraintEnforcer
         var
-        (Maybe (Type atom))
-        (InferenceError var err atom)
+        (Maybe (Type atom inter))
+        (InferenceError var err atom inter)
 
     enforceRelation (var1, var2) Equality =
       go <$> queryVar var1 <*> queryVar var2 where
@@ -204,9 +204,9 @@ solve problem = do
           return [(var1, bound1'), (var2, bound2')]
 
     enforceEQ ::
-      (Maybe (Type atom), ChangeStatus) ->
-      (Maybe (Type atom), ChangeStatus) ->
-      Either (TypeError err atom) (Maybe (Type atom))
+      (Maybe (Type atom inter), ChangeStatus) ->
+      (Maybe (Type atom inter), ChangeStatus) ->
+      Either (TypeError err atom inter) (Maybe (Type atom inter))
 
     enforceEQ (bound, Unchanged) (_, Unchanged) = Right bound
     enforceEQ (bound1, Changed) (_, Unchanged) = Right bound1
@@ -217,8 +217,8 @@ solve problem = do
       (var, Formulation, var, var) ->
       Prop.ConstraintEnforcer
         var
-        (Maybe (Type atom))
-        (InferenceError var err atom)
+        (Maybe (Type atom inter))
+        (InferenceError var err atom inter)
 
     enforceFormulation (wholeVar, form, var1, var2) =
       {- Special handling is required when var1 == var2.  See the comments on enforceFuncConstraint
@@ -270,8 +270,8 @@ solve problem = do
       (var, (var, var)) ->
       Prop.ConstraintEnforcer
         var
-        (Maybe (Type atom))
-        (InferenceError var err atom)
+        (Maybe (Type atom inter))
+        (InferenceError var err atom inter)
 
     enforceFuncConstraint (funcVar, (argVar, retVar)) =
       {-

@@ -19,6 +19,9 @@ import Data.Aeson
 newtype AtomIdent = AtomIdent [Text]
   deriving (Generic, Eq, Ord, Show, ToJSON, FromJSON)
 
+newtype InteractionIdent = InteractionIdent [Text]
+  deriving (Generic, Eq, Ord, Show, ToJSON, FromJSON)
+
 data Conversion = Conversion
   { subtype :: AtomIdent
   , supertype :: AtomIdent

@@ -25,6 +25,7 @@ import Data.Monoid ((<>))
 import Data.Void (Void, absurd)
 
 type AtomIdent = External.AtomIdent
+type InterIdent = External.InteractionIdent
 
 data AtomBound s = AtomBound
   { boundLo :: Subset 'Upper s AtomIdent -- lower bound
@@ -114,7 +115,7 @@ data TypeVar
 convertConstraint :: forall s.
   ProblemContext s ->
   External.Constraint ->
-  [Constraint TypeVar (AtomBound s)]
+  [Constraint TypeVar (AtomBound s) InterIdent]
 
 convertConstraint ctx (External.InstantiationConstraint externVar polyType) =
   let
@@ -126,7 +127,7 @@ convertConstraint ctx (External.InstantiationConstraint externVar polyType) =
 
     instantiate ::
       External.PolyType ->
-      State InternalVarID ([Constraint TypeVar (AtomBound s)], TypeVar)
+      State InternalVarID ([Constraint TypeVar (AtomBound s) InterIdent], TypeVar)
 
     instantiate (External.AtomType atom) = do
       let node = ctxToNode ctx atom
@@ -198,7 +199,7 @@ externalVarOf (ExternalVar var) = var
 externalVarOf (InternalVar var _) = var
 externalVarOf (QuantifiedVar var _) = var
 
-relevantVars :: Constraint TypeVar (AtomBound s) -> [External.TypeVar]
+relevantVars :: Constraint TypeVar (AtomBound s) InterIdent -> [External.TypeVar]
 relevantVars (BoundConstraint var _) = [externalVarOf var]
 relevantVars (RelationConstraint var1 _ var2) = map externalVarOf [var1, var2]
 relevantVars (FormulationConstraint var1 _ var2 var3) = map externalVarOf [var1, var2, var3]
@@ -215,7 +216,7 @@ formatNode node =
     TopNodeValue -> "{the supertype of all types}"
     BotNodeValue -> "Never"
 
-formatType :: Maybe (Type (AtomBound s)) -> Text
+formatType :: Maybe (Type (AtomBound s) InterIdent) -> Text
 
 formatType (Just (Atom (AtomBound lo hi))) =
   case filter (`member` hi) (minimal lo) of
@@ -236,7 +237,7 @@ formatType (Just Never) = "Never"
 
 formatType Nothing = "{unconstrainted type}"
 
-formatTypeError :: TypeError AtomError (AtomBound s) -> Text
+formatTypeError :: TypeError AtomError (AtomBound s) InterIdent -> Text
 
 formatTypeError (Unify.AtomError (AtomError void)) = absurd void
 
@@ -248,7 +249,7 @@ formatTypeError (NotNeverConvertible t1) =
   "Type `" <> formatType (Just t1) <> "` is not convertible to `Never`"
 
 convertError ::
-  InferenceError TypeVar AtomError (AtomBound s) ->
+  InferenceError TypeVar AtomError (AtomBound s) InterIdent ->
   (Text, [External.TypeVar])
 
 convertError (InferenceError constraint content) =
@@ -281,7 +282,7 @@ convertError (NotFunction var badType) =
 convertError RecursiveType =
   ("I'm inferring some weird, infinitely-deep types.  This is usually a problem with recursion.", [])
 
-convertSolution :: Maybe (Type (AtomBound s)) -> Either Text External.TypeSolution
+convertSolution :: Maybe (Type (AtomBound s) InterIdent) -> Either Text External.TypeSolution
 
 convertSolution Nothing = Right External.NeverTypeSolution
 
