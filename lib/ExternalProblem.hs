@@ -28,26 +28,6 @@ data Conversion = Conversion
 newtype TypeVar = TypeVar Text
   deriving (Generic, Eq, Ord, Show, ToJSON, FromJSON)
 
-data Bounds
-  = AtomTypeBounds
-    { lower_bound :: Maybe AtomIdent
-    , upper_bound :: Maybe AtomIdent
-    }
-  | TypeApplicationBounds
-    { head_bounds :: Maybe Bounds
-    , param_bounds :: Maybe Bounds
-    }
-  | FunctionTypeBounds
-    { argument_bounds :: Maybe Bounds
-    , return_bounds :: Maybe Bounds
-    }
-  | TupleTypeBounds
-    { first_bounds :: Maybe Bounds
-    , second_bounds :: Maybe Bounds
-    }
-  | NeverTypeBounds
-  deriving (Generic, Eq, Ord, Show, ToJSON, FromJSON)
-
 newtype BoundVar = BoundVar Text
   deriving (Generic, Eq, Ord, Show, ToJSON, FromJSON)
 
@@ -70,11 +50,7 @@ data PolyType
   deriving (Generic, Eq, Ord, Show, ToJSON, FromJSON)
 
 data Constraint
-  = BoundsConstraint
-    { bounds_constraint_var :: TypeVar
-    , bounds :: Bounds
-    }
-  | InstantiationConstraint
+  = InstantiationConstraint
     { instantiation_constraint_var :: TypeVar
     , polymorphic_type :: PolyType
     }

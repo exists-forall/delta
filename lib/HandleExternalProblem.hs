@@ -111,34 +111,10 @@ data TypeVar
   | InternalVar External.TypeVar InternalVarID
   deriving (Eq, Ord)
 
-convertBounds :: ProblemContext s -> External.Bounds -> Type (AtomBound s)
-
-convertBounds ctx (External.AtomTypeBounds externLo externHi) =
-  let
-    lo = fromMaybe defaultLo $ fmap (extendWithParents . ctxToNode ctx) externLo
-    hi = fromMaybe defaultHi $ fmap (extendWithChildren . ctxToNode ctx) externHi
-  in
-    Atom (AtomBound lo hi)
-
-convertBounds ctx (External.TypeApplicationBounds headBounds tailBounds) =
-  App (fmap (convertBounds ctx) headBounds) (fmap (convertBounds ctx) tailBounds)
-
-convertBounds ctx (External.FunctionTypeBounds argBounds retBounds) =
-  -- Should the API expose some way to specify the `SpecialBounds`?
-  Func (SpecialBounds True True) (fmap (convertBounds ctx) argBounds) (fmap (convertBounds ctx) retBounds)
-
-convertBounds ctx (External.TupleTypeBounds fstBounds sndBounds) =
-  Tuple (SpecialBounds True True) (fmap (convertBounds ctx) fstBounds) (fmap (convertBounds ctx) sndBounds)
-
-convertBounds _ External.NeverTypeBounds = Never
-
 convertConstraint :: forall s.
   ProblemContext s ->
   External.Constraint ->
   [Constraint TypeVar (AtomBound s)]
-
-convertConstraint ctx (External.BoundsConstraint externVar externBounds) =
-  [BoundConstraint (ExternalVar externVar) (convertBounds ctx externBounds)]
 
 convertConstraint ctx (External.InstantiationConstraint externVar polyType) =
   let
@@ -210,7 +186,6 @@ convertConstraint _ (External.TupleEqualityConstraint tupleVar fstVar sndVar) =
   [FormulationConstraint (ExternalVar tupleVar) TupleOf (ExternalVar fstVar) (ExternalVar sndVar)]
 
 constraintExternalVars :: External.Constraint -> [External.TypeVar]
-constraintExternalVars (External.BoundsConstraint var _) = [var]
 constraintExternalVars (External.InstantiationConstraint var _) = [var]
 constraintExternalVars (External.SubtypeConstraint var1 var2) = [var1, var2]
 constraintExternalVars (External.ExactEqualityConstraint var1 var2) = [var1, var2]
