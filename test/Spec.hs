@@ -8,6 +8,8 @@ import qualified TopoSortTests
 import qualified UnifyTests
 import qualified PropagateTests
 import qualified TypeInferTests
+import qualified ExternalProblemTests
+import qualified HandleExternalProblemTests
 
 import Test.Hspec
 
@@ -22,3 +24,5 @@ main = hspec $ do
     UnifyTests.test
     PropagateTests.test
     TypeInferTests.test
+    ExternalProblemTests.test
+    HandleExternalProblemTests.test

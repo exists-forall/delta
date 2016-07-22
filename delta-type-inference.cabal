@@ -22,6 +22,8 @@ library
                      , Unify
                      , Propagate
                      , TypeInfer
+                     , ExternalProblem
+                     , HandleExternalProblem
 
                      -- Utility modules
                      , HelpfulUnsafeLookup
@@ -33,6 +35,8 @@ library
                      , containers
                      , mtl
                      , transformers
+                     , text
+                     , aeson
 
 test-suite delta-type-inference-tests
   type:                exitcode-stdio-1.0
@@ -65,6 +69,12 @@ test-suite delta-type-inference-tests
                      , TypeInfer
                      , TypeInferTests
 
+                     , ExternalProblem
+                     , ExternalProblemTests
+
+                     , HandleExternalProblem
+                     , HandleExternalProblemTests
+
                      -- non-tested modules
                      , HelpfulUnsafeLookup
                      , FoldInsert
@@ -79,3 +89,5 @@ test-suite delta-type-inference-tests
                      , hspec
                      , hspec-core
                      , transformers
+                     , text
+                     , aeson
