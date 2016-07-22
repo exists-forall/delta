@@ -50,8 +50,8 @@ relations =
   , 'S' `ChildOf` 'T'
   ]
 
-testInSession :: forall s. (Char -> Node s Char) -> (Node s Char -> NodeValue Char) -> Spec
-testInSession toNode fromNode = do
+testInSession :: forall s. (Char -> Node s Char) -> Spec
+testInSession toNode = do
   let familialNodes = map toNode ['A'..'T']
   let [a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t] = familialNodes
   let x = toNode 'X'
@@ -92,10 +92,10 @@ testInSession toNode fromNode = do
       (fromNode x, fromNode y) `shouldBe` (NodeValue 'X', NodeValue 'Y')
 
     it "produces TopNodeValue when called with topNode" $
-      fromNode topNode `shouldBe` TopNodeValue
+      (fromNode topNode :: NodeValue Char) `shouldBe` TopNodeValue
 
     it "produces BotNodeValue when called with botNode" $
-      fromNode botNode `shouldBe` BotNodeValue
+      (fromNode botNode :: NodeValue Char) `shouldBe` BotNodeValue
 
   let
     expectedChildOfRelations =

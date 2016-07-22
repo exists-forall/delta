@@ -8,6 +8,7 @@ module PosetSubsetSession
 
   , buildPoset
   , runSession
+  , fromNode
 
   , topNode
   , botNode
@@ -295,5 +296,5 @@ fromNode BotNode = BotNodeValue
 fromNode (FamilyNode poset family index) =
   NodeValue ((valuesForNodes poset) Map.! (family, index))
 
-runSession :: (Ord a) => (forall s. (a -> Node s a) -> (Node s a -> NodeValue a) -> b) -> Poset a -> b
-runSession body poset = body (toNode poset) fromNode
+runSession :: (Ord a) => (forall s. (a -> Node s a) -> b) -> Poset a -> b
+runSession body poset = body (toNode poset)

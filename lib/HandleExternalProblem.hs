@@ -101,7 +101,6 @@ atomUnifier = Unifier
 
 data ProblemContext s = ProblemContext
   { ctxToNode :: AtomIdent -> Node s AtomIdent
-  , ctxFromNode :: Node s AtomIdent -> NodeValue AtomIdent
   }
 
 newtype InternalVarID = InternalVarID Int deriving (Eq, Ord, Enum)
@@ -234,85 +233,84 @@ formatAtomIdent :: AtomIdent -> Text
 formatAtomIdent (External.AtomIdent []) = "{empty path}"
 formatAtomIdent (External.AtomIdent path) = last path
 
-formatNode :: ProblemContext s -> Node s AtomIdent -> Text
-formatNode ctx node =
-  case ctxFromNode ctx node of
+formatNode :: Node s AtomIdent -> Text
+formatNode node =
+  case fromNode node of
     NodeValue ident -> formatAtomIdent ident
     TopNodeValue -> "{the supertype of all types}"
     BotNodeValue -> "Never"
 
-formatType :: ProblemContext s -> Maybe (Type (AtomBound s)) -> Text
+formatType :: Maybe (Type (AtomBound s)) -> Text
 
-formatType ctx (Just (Atom (AtomBound lo hi))) =
+formatType (Just (Atom (AtomBound lo hi))) =
   case filter (`member` hi) (minimal lo) of
     [] -> "{no possible type}"
-    [node] -> formatNode ctx node
-    nodes -> "{any of these types: " <> T.intercalate " or " (map (formatNode ctx) nodes) <> "}"
+    [node] -> formatNode node
+    nodes -> "{any of these types: " <> T.intercalate " or " (map formatNode nodes) <> "}"
 
-formatType ctx (Just (App headType paramType)) =
-  formatType ctx headType <> "<" <> formatType ctx paramType <> ">"
+formatType (Just (App headType paramType)) =
+  formatType headType <> "<" <> formatType paramType <> ">"
 
-formatType ctx (Just (Func _ argType retType)) =
-  formatType ctx argType <> "->" <> formatType ctx retType
+formatType (Just (Func _ argType retType)) =
+  formatType argType <> "->" <> formatType retType
 
-formatType ctx (Just (Tuple _ fstType sndType)) =
-  formatType ctx fstType <> "," <> formatType ctx sndType
+formatType (Just (Tuple _ fstType sndType)) =
+  formatType fstType <> "," <> formatType sndType
 
-formatType _ (Just Never) = "Never"
+formatType (Just Never) = "Never"
 
-formatType _ Nothing = "{unconstrainted type}"
+formatType Nothing = "{unconstrainted type}"
 
-formatTypeError :: ProblemContext s -> TypeError AtomError (AtomBound s) -> Text
+formatTypeError :: TypeError AtomError (AtomBound s) -> Text
 
-formatTypeError _ (Unify.AtomError (AtomError void)) = absurd void
+formatTypeError (Unify.AtomError (AtomError void)) = absurd void
 
-formatTypeError ctx (StructureMismatch t1 t2) =
-  "I couldn't match type `" <> formatType ctx (Just t1) <> "` with type `" <> formatType ctx (Just t2) <> "`, " <>
+formatTypeError (StructureMismatch t1 t2) =
+  "I couldn't match type `" <> formatType (Just t1) <> "` with type `" <> formatType (Just t2) <> "`, " <>
     "because they are not structurally compatible."
 
-formatTypeError ctx (NotNeverConvertible t1) =
-  "Type `" <> formatType ctx (Just t1) <> "` is not convertible to `Never`"
+formatTypeError (NotNeverConvertible t1) =
+  "Type `" <> formatType (Just t1) <> "` is not convertible to `Never`"
 
 convertError ::
-  ProblemContext s ->
   InferenceError TypeVar AtomError (AtomBound s) ->
   (Text, [External.TypeVar])
 
-convertError ctx (InferenceError constraint content) =
+convertError (InferenceError constraint content) =
   let
     vars = relevantVars constraint
-    formatted = formatTypeError ctx content
+    formatted = formatTypeError content
   in
     (formatted, vars)
 
-convertError ctx (FormMismatch var form badType) =
+convertError (FormMismatch var form badType) =
   let
     formDescription = case form of
       AppOf -> "type application (i.e., a type of the form `foo<bar>`)"
       TupleOf -> "tuple (i.e., a type of the form `foo,bar`)"
     msg =
       "I expected the type here to be a " <> formDescription <> ", but instead I inferred this type: " <>
-      formatType ctx badType
+      formatType badType
   in
     (msg, [externalVarOf var])
 
-convertError ctx (NotFunction var badType) =
+convertError (NotFunction var badType) =
   let
     msg =
       "I expected the type here to be a function (i.e. a type of the form `foo->bar`), but instead " <>
       "I inferred this type: " <>
-      formatType ctx badType
+      formatType badType
   in
     (msg, [externalVarOf var])
 
-convertError _ RecursiveType =
+convertError RecursiveType =
   ("I'm inferring some weird, infinitely-deep types.  This is usually a problem with recursion.", [])
 
-convertSolution :: ProblemContext s -> Maybe (Type (AtomBound s)) -> Either Text External.TypeSolution
+convertSolution :: Maybe (Type (AtomBound s)) -> Either Text External.TypeSolution
 
-convertSolution _ Nothing = Right External.NeverTypeSolution
+convertSolution Nothing = Right External.NeverTypeSolution
 
-convertSolution ctx (Just (Atom (AtomBound lo hi))) =
+convertSolution (Just (Atom (AtomBound lo hi))) =
   let
     minAtoms = minimal lo
     maxAtoms = maximal hi
@@ -320,11 +318,11 @@ convertSolution ctx (Just (Atom (AtomBound lo hi))) =
     [] -> Left $
       "I can't find any type that could work here." <>
       "\nI'm inferring that this type must be convertible from:\n    " <>
-      T.intercalate " or " (map (formatNode ctx) minAtoms) <>
+      T.intercalate " or " (map formatNode minAtoms) <>
       "\nBut also that it must be convertible to:\n    " <>
-      T.intercalate " or " (map (formatNode ctx) maxAtoms)
+      T.intercalate " or " (map formatNode maxAtoms)
     [node] ->
-      case ctxFromNode ctx node of
+      case fromNode node of
         NodeValue atomIdent -> Right $ External.AtomTypeSolution atomIdent
         TopNodeValue -> Left "I'm inferring that all possible types have to be convertible to this type, which is impossible."
         BotNodeValue -> Right External.NeverTypeSolution
@@ -332,35 +330,35 @@ convertSolution ctx (Just (Atom (AtomBound lo hi))) =
       "There are several possible types that could work here, but I have no way to decide which one to use.\n" <>
       "In other words, the type is ambiguous.\n" <>
       "Here are the most specific types that could work here:\n\t" <>
-      T.intercalate " or " (map (formatNode ctx) nodes)
+      T.intercalate " or " (map formatNode nodes)
 
-convertSolution ctx (Just (App headType paramType)) = do
-  headSolution <- convertSolution ctx headType
+convertSolution (Just (App headType paramType)) = do
+  headSolution <- convertSolution headType
   case headSolution of
     External.NeverTypeSolution -> return External.NeverTypeSolution
     _ -> do
-      paramSolution <- convertSolution ctx paramType
+      paramSolution <- convertSolution paramType
       return $ External.TypeApplicationSolution headSolution paramSolution
 
-convertSolution ctx (Just (Func sBounds argType retType)) =
+convertSolution (Just (Func sBounds argType retType)) =
   if constrainedLo sBounds
     then do
-      argSolution <- convertSolution ctx argType
-      retSolution <- convertSolution ctx retType
+      argSolution <- convertSolution argType
+      retSolution <- convertSolution retType
       return $ External.FunctionTypeSolution argSolution retSolution
     else
       return External.NeverTypeSolution
 
-convertSolution ctx (Just (Tuple sBounds fstType sndType)) =
+convertSolution (Just (Tuple sBounds fstType sndType)) =
   if constrainedLo sBounds
     then do
-      fstSolution <- convertSolution ctx fstType
-      sndSolution <- convertSolution ctx sndType
+      fstSolution <- convertSolution fstType
+      sndSolution <- convertSolution sndType
       return $ External.TupleTypeSolution fstSolution sndSolution
     else
       return External.NeverTypeSolution
 
-convertSolution _ (Just Never) =
+convertSolution (Just Never) =
   return External.NeverTypeSolution
 
 unwrapExternalVar :: External.TypeVar -> External.UnwrappedTypeVar
@@ -376,11 +374,11 @@ solveSubProblem ctx externConstraints =
       }
     allVars = Set.toList $ Set.fromList $ concatMap constraintExternalVars externConstraints
   in case solve inferenceProblem of
-    Left err -> uncurry External.Error (convertError ctx err)
+    Left err -> uncurry External.Error (convertError err)
     Right solution ->
       let
         getVar var =
-          case convertSolution ctx $ solution $ ExternalVar var of
+          case convertSolution $ solution $ ExternalVar var of
             Left errMsg -> Left (errMsg, [var])
             Right sol -> Right (unwrapExternalVar var, sol)
       in case mapM getVar allVars of
@@ -395,11 +393,10 @@ solveExternal problem =
     Just poset -> runSession go poset where
       go :: forall s.
         (AtomIdent -> Node s AtomIdent) ->
-        (Node s AtomIdent -> NodeValue AtomIdent) ->
         External.Results
-      go toNode fromNode =
+      go toNode =
         let
-          ctx = ProblemContext toNode fromNode
+          ctx = ProblemContext toNode
           subproblems = External.subproblems problem
         in
           External.Results $ Map.map (solveSubProblem ctx) subproblems
