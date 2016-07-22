@@ -206,14 +206,12 @@ solve problem = do
     enforceEQ ::
       (Maybe (Type atom), ChangeStatus) ->
       (Maybe (Type atom), ChangeStatus) ->
-      Either (TypeError err atom) (Maybe (Type atom), Maybe (Type atom))
+      Either (TypeError err atom) (Maybe (Type atom))
 
-    enforceEQ (bound1, Unchanged) (bound2, Unchanged) = Right (bound1, bound2)
-    enforceEQ (bound1, Changed) (_, Unchanged) = Right (bound1, bound1)
-    enforceEQ (_, Unchanged) (bound2, Changed) = Right (bound2, bound2)
-    enforceEQ (bound1, Changed) (bound2, Changed) =
-      let result = unifyEQ unifier bound1 bound2
-      in fmap (\x -> (x, x)) result
+    enforceEQ (bound, Unchanged) (_, Unchanged) = Right bound
+    enforceEQ (bound1, Changed) (_, Unchanged) = Right bound1
+    enforceEQ (_, Unchanged) (bound2, Changed) = Right bound2
+    enforceEQ (bound1, Changed) (bound2, Changed) = unifyEQ unifier bound1 bound2
 
     enforceFormulation ::
       (var, Formulation, var, var) ->
@@ -234,9 +232,9 @@ solve problem = do
             (part1, part2) <- case splitFormulation form wholeBound of
               Just parts -> Right parts
               Nothing -> Left $ FormMismatch wholeVar form wholeBound
-            (part1', bound1') <- markError constraint $
+            part1' <- markError constraint $
               enforceEQ (part1, wholeChange) (bound1, change1)
-            (part2', bound2') <- markError constraint $
+            part2' <- markError constraint $
               enforceEQ (part2, wholeChange) (bound2, change2)
             let
               wholeUpdate =
@@ -245,7 +243,7 @@ solve problem = do
                   else []
               boundUpdates =
                 if wholeChange == Changed
-                  then [(var1, bound1'), (var2, bound2')]
+                  then [(var1, part1'), (var2, part2')]
                   else []
             return $ wholeUpdate ++ boundUpdates
           in
@@ -296,9 +294,9 @@ solve problem = do
               (_, part1, part2) <- case funcComponents funcBound of
                 Just components -> Right components
                 Nothing -> Left $ NotFunction funcVar funcBound
-              (part1', bound1') <- markError constraint $
+              part1' <- markError constraint $
                 enforceEQ (part1, funcChange) (bound1, change1)
-              (part2', bound2') <- markError constraint $
+              part2' <- markError constraint $
                 enforceEQ (part2, funcChange) (bound2, change2)
               let
                 newFunc = Just $ Func (SpecialBounds True True) part1' part2'
@@ -308,7 +306,7 @@ solve problem = do
                     else []
                 boundUpdates =
                   if funcChange == Changed
-                    then [(argVar, bound1'), (retVar, bound2')]
+                    then [(argVar, part1'), (retVar, part2')]
                     else []
               return $ funcUpdate ++ boundUpdates
           in
