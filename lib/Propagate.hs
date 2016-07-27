@@ -24,12 +24,12 @@ import Data.STRef hiding (modifySTRef)
 
 import Control.Monad.Trans.Except
 import Control.Monad.Trans (lift)
-import Control.Monad (forM, forM_, join)
+import Control.Monad (forM, forM_)
 
 import Data.Bifunctor (second)
 import Data.Maybe (fromMaybe, fromJust)
 
-import FoldInsert (fromListWithCons)
+import CollectionUtils (fromListWithCons, mapFromListWithKeyM)
 
 data ChangeStatus = Changed | Unchanged deriving (Eq, Ord, Show)
 
@@ -102,12 +102,6 @@ data Update val = Update
   { mergeStatus :: MergeStatus
   , newValue :: val
   }
-
-mapFromListWithKeyM :: (Ord k, Monad m) => (k -> a -> a -> m a) -> [(k, a)] -> m (Map k a)
-mapFromListWithKeyM f =
-  mapM id .
-  Map.fromListWithKey (\k a b -> join (f k <$> a <*> b)) .
-  map (second return)
 
 solve :: forall var val err. (Ord var, Eq val) => Problem var val err -> Either err (var -> Maybe val)
 solve problem = runST $ runExceptT go where

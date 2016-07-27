@@ -27,7 +27,7 @@ library
 
                      -- Utility modules
                      , HelpfulUnsafeLookup
-                     , FoldInsert
+                     , CollectionUtils
                      , OrderedPair
   ghc-options:         -Wall
   default-language:    Haskell2010
@@ -77,7 +77,7 @@ test-suite delta-type-inference-tests
 
                      -- non-tested modules
                      , HelpfulUnsafeLookup
-                     , FoldInsert
+                     , CollectionUtils
                      , OrderedPair
 
   build-depends:       base >= 4.7 && < 5

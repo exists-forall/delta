@@ -1,6 +1,6 @@
 module Families (Family, Index, buildFamilies) where
 
-import FoldInsert (consInsert)
+import CollectionUtils (consInsert)
 
 import qualified Data.Map as Map
 import Data.Map (Map)
