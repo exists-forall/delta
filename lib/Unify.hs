@@ -228,8 +228,8 @@ liftAtomUnifier atomUnifier =
 
         Just (TwoApps (head1, param1) (head2, param2)) -> do
           (head1', head2') <- typeUnifyLTE head1 head2
-          (param1', param2') <- fmap (dup (,)) (typeUnifyEQ param1 param2) -- type constructors are invariant in their type parameter
-          return (Just (App head1' param1'), Just (App head2' param2'))
+          param' <- (typeUnifyEQ param1 param2) -- type constructors are invariant in their type parameter
+          return (Just (App head1' param'), Just (App head2' param'))
 
         Just (TwoFuncs (sBounds1, arg1, ret1) (sBounds2, arg2, ret2)) -> do
           let (sBounds1', sBounds2') = specialBoundsLTE sBounds1 sBounds2
