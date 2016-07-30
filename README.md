@@ -40,7 +40,7 @@ In plain english, here's what all that actually means:
   
   // A function which can work with lists of any type
   // Delta interprets the lowercase letter as a sort of "wildcard"
-  def reverseAnything(List<t>) -> List<t>;
+  def reverseAnything(lst: List<t>) -> List<t>;
   ```
   
   "Rank-1" is really a way of saying what features Delta *doesn't* have (some languages are Rank-2 or even Rank-N), so it doesn't matter much here.
@@ -61,9 +61,9 @@ In plain english, here's what all that actually means:
   }
   ```
   
-  A value of type `Color` might be an `RGB` color, in which case it has a field for `r` (red), `g` (green), and `b` (blue), or it might be a `GrayScale` color, in which case it only has a field for `brightness`.  In this example, there is an extra [`alpha` (opacity)](https://en.wikipedia.org/wiki/Alpha_compositing) field that doesn't live in either `case`.  Because it's not inside a `case`, the `alpha` field is available on all values -- both `RGB` and `Grayscale` colors have the `alpha` field.  Cases are a bit like subclasses in object-oriented programming, except they let you specify the entire type hiearchy in one place instead of spreading it out across the program.
+  A value of type `Color` might be an `RGB` color, in which case it has a field for `r` (red), `g` (green), and `b` (blue), or it might be a `Grayscale` color, in which case it only has a field for `brightness`.  In this example, there is an extra [`alpha` (opacity)](https://en.wikipedia.org/wiki/Alpha_compositing) field that doesn't live in either `case`.  Because it's not inside a `case`, the `alpha` field is available on all values; both `RGB` and `Grayscale` colors have the `alpha` field.  Cases are a bit like subclasses in object-oriented programming, except they let you specify the entire type hiearchy in one place instead of spreading it out across the program.
 
-- *"Row-base effect typing"*: Function signatures in Delta tell you *everything* about a function's inputs and outputs, not just what its arguments and return values are.  Inputs and outputs which are "hidden" in most languages are explicitly documented and verified in Delta, which helps keep your code modular, makes complex codebases easier to navigate, and protects against large classes of subtle bugs.  These hidden inputs and outputs are often called "side effects," but an "effect" sounds like it only refers to hidden *outputs*, when in fact hidden *inputs* are just as important.  Delta calls these hidden inputs and outputs *"interactions,"* because they're a way for functions to *interact* directly with their wider environment without going through arguments or return values.
+- *"Row-based effect typing"*: Function signatures in Delta tell you *everything* about a function's inputs and outputs, not just what its arguments and return values are.  Inputs and outputs which are "hidden" in most languages are explicitly documented and verified in Delta, which helps keep your code modular, makes complex codebases easier to navigate, and protects against large classes of subtle bugs.  These hidden inputs and outputs are often called "side effects," but an "effect" sounds like it only refers to hidden *outputs*, when in fact hidden *inputs* are just as important.  Delta calls these hidden inputs and outputs *"interactions,"* because they're a way for functions to *interact* directly with their wider environment without going through arguments or return values.
 
   ```delta
   // This function has no interactions
