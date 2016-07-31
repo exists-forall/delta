@@ -10,11 +10,19 @@ import OrderedPair
 import DirectedGraph
 import TopoSort
 
+import CollectionUtils (transferValues)
+
+import qualified ComplementSet as CSet
+import ComplementSet (ComplementSet (..))
+
 import qualified Data.Map as Map
 import Data.Map (Map)
 
+import qualified Data.Set as Set
+import Data.Set (Set)
+
 import Control.Monad (foldM, join, when)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, fromJust)
 import Data.Bifunctor (first, second)
 
 data Relation = Equality | Inequality Inequality deriving (Eq, Ord, Show)
@@ -26,6 +34,8 @@ data Constraint var atom inter
   | RelationConstraint var Relation var
   | FormulationConstraint var Formulation var var
   | FuncConstraint var (var, var)
+  | InteractionConstraint var inter [var] -- This is an *inequality* constraint of the form i<x> ≤ v
+  | InteractionDifferenceConstraint var (Set inter) var
   deriving (Eq, Ord, Show)
 
 data InferenceError var err atom inter
@@ -36,6 +46,8 @@ data InferenceError var err atom inter
   | FormMismatch var Formulation (Maybe (Type atom inter))
   | NotFunction var (Maybe (Type atom inter))
   | RecursiveType -- This should probably have some useful data attached to it
+  | NotInteraction var (Maybe (Type atom inter))
+  | InteractionCantContain var (Set inter) (Maybe (Type atom inter))
   deriving (Eq, Ord, Show)
 
 data Problem var err atom inter = Problem
@@ -50,10 +62,12 @@ data ConsolidatedConstraints var err atom inter = ConsolidatedConstraints
   , relationConstraints :: Map (OrderedPair var) Relation
   , formulationConstraints :: [(var, Formulation, var, var)]
   , funcConstraints :: [(var, (var, var))]
+  , interactionConstraints :: [(var, inter, [var])]
+  , interactionDifferenceConstraints :: [(var, Set inter, var)]
   }
 
 emptyConstraints :: ConsolidatedConstraints var err atom inter
-emptyConstraints = ConsolidatedConstraints Map.empty Map.empty [] []
+emptyConstraints = ConsolidatedConstraints Map.empty Map.empty [] [] [] []
 
 relationConjunction :: Relation -> Relation -> Relation
 relationConjunction r1 r2 =
@@ -79,6 +93,12 @@ structuralSizeRelations (FuncConstraint func (arg, ret)) =
   [ func `StructurallyLargerThan` arg
   , func `StructurallyLargerThan` ret
   ]
+structuralSizeRelations (InteractionConstraint var _ params) =
+  map (var `StructurallyLargerThan`) params
+structuralSizeRelations (InteractionDifferenceConstraint var inters restVar) =
+  if Set.null inters
+    then []
+    else [var `StructurallyLargerThan` restVar]
 
 impliesIllegalRecursiveTypes :: (Ord var) => [Constraint var atom inter] -> Bool
 impliesIllegalRecursiveTypes constraints =
@@ -113,6 +133,11 @@ funcComponents :: Maybe (Type atom inter) -> Maybe (SpecialBounds, Maybe (Type a
 funcComponents Nothing = Just (SpecialBounds False False, Nothing, Nothing)
 funcComponents (Just (Func sBounds arg ret)) = Just (sBounds, arg, ret)
 funcComponents (Just _) = Nothing
+
+interactionComponents :: Maybe (Type atom inter) -> Maybe (InteractionLower atom inter, InteractionUpper inter)
+interactionComponents Nothing = Just (Map.empty, Excluded Set.empty)
+interactionComponents (Just (Interaction lo hi)) = Just (lo, hi)
+interactionComponents (Just _) = Nothing
 
 markError :: Constraint var atom inter -> Either (TypeError err atom inter) a -> Either (InferenceError var err atom inter) a
 markError constraint = first (InferenceError constraint)
@@ -178,6 +203,20 @@ solve problem = do
         newFuncConstraints = (var1, (var2, var3)) : oldFuncConstraints
       in
         Right constraints { funcConstraints = newFuncConstraints }
+
+    includeConstraint constraints (InteractionConstraint var inter params) =
+      let
+        oldInteractionConstraints = interactionConstraints constraints
+        newInteractionConstraints = (var, inter, params) : oldInteractionConstraints
+      in
+        Right constraints { interactionConstraints = newInteractionConstraints }
+
+    includeConstraint constraints (InteractionDifferenceConstraint var inters restVar) =
+      let
+        oldInteractionDifferenceConstraints = interactionDifferenceConstraints constraints
+        newInteractionDifferenceConstraints = (var, inters, restVar) : oldInteractionDifferenceConstraints
+      in
+        Right constraints { interactionDifferenceConstraints = newInteractionDifferenceConstraints }
 
     enforceRelation ::
       (var, var) ->
@@ -290,6 +329,92 @@ solve problem = do
       in
         go <$> queryVar funcVar <*> queryVar argVar <*> queryVar retVar
 
+    enforceDifferenceConstraint ::
+      (var, Set inter, var) ->
+      Prop.ConstraintEnforcer
+        var
+        (Maybe (Type atom inter))
+        (InferenceError var err atom inter)
+
+    enforceDifferenceConstraint (wholeVar, inters, restVar) =
+      go <$> queryVar wholeVar <*> queryVar restVar where
+        wholeComponents whole =
+          case interactionComponents whole of
+            Just components -> Right components
+            Nothing -> Left $ NotInteraction wholeVar whole
+
+        restComponents rest =
+          case interactionComponents rest of
+            Just components -> Right components
+            Nothing -> Left $ NotInteraction restVar rest
+
+        checkRestDisjoint (restLo, restHi) =
+          when (any (`Map.member` restLo) inters || any (`CSet.member` restHi) inters) $
+            Left $ InteractionCantContain restVar inters (Just (Interaction restLo restHi))
+
+        constraint = InteractionDifferenceConstraint wholeVar inters restVar
+
+        go (_, Unchanged) (_, Unchanged) = Right []
+
+        go (whole, Changed) (_, Unchanged) = do
+          (wholeLo, wholeHi) <- wholeComponents whole
+          let (restLo, restHi) = interactionSubtract inters (wholeLo, wholeHi)
+          return [(restVar, Just $ Interaction restLo restHi)]
+
+        go (whole, Unchanged) (rest, Changed) = do
+          (wholeLo, wholeHi) <- wholeComponents whole
+          (restLo, restHi) <- restComponents rest
+          checkRestDisjoint (restLo, restHi)
+          let wholeLo' = transferValues restLo wholeLo
+          let wholeHi' = CSet.union wholeHi restHi
+          return [(wholeVar, Just $ Interaction wholeLo' wholeHi')]
+
+        go (whole, Changed) (rest, Changed) = do
+          (wholeLo, wholeHi) <- wholeComponents whole
+          let (wholeSubLo, wholeSubHi) = interactionSubtract inters (wholeLo, wholeHi)
+          (restLo', restHi') <- restComponents =<< (markError constraint $
+            unifyEQ unifier (Just (Interaction wholeSubLo wholeSubHi)) rest)
+          checkRestDisjoint (restLo', restHi')
+          let wholeLo' = Map.unionWith const restLo' wholeLo
+          let wholeHi' = CSet.intersection wholeHi (CSet.union (Included inters) restHi')
+          return
+            [ (wholeVar, Just $ Interaction wholeLo' wholeHi')
+            , (restVar, Just $ Interaction restLo' restHi')
+            ]
+
+    enforceInteractionConstraint ::
+      (var, inter, [var]) ->
+      Prop.ConstraintEnforcer
+        var
+        (Maybe (Type atom inter))
+        (InferenceError var err atom inter)
+
+    enforceInteractionConstraint (wholeVar, inter, paramVars) =
+      go <$> queryVar wholeVar <*> traverse (fmap fst . queryVar) paramVars where
+        constraint = InteractionConstraint wholeVar inter paramVars
+
+        wholeComponents whole =
+          case interactionComponents whole of
+            Just components -> Right components
+            Nothing -> Left $ NotInteraction wholeVar whole
+
+        go (whole, Unchanged) params = do
+          (wholeLo, wholeHi) <- wholeComponents whole
+          let wholeLo' = Map.insert inter params wholeLo
+          return [(wholeVar, Just $ Interaction wholeLo' wholeHi)]
+
+        go (whole, Changed) params = do
+          {- TODO: this could benefit from an optimization which takes into account the change
+          status of each param and avoids the expensive symmetric equality unification step when
+          possible.
+          -}
+          let syntheticLesser = Interaction (Map.singleton inter params) (CSet.Excluded Set.empty)
+          whole' <- fmap snd $ markError constraint $ unifyLTE unifier (Just syntheticLesser) whole
+          (wholeLo, _) <- wholeComponents whole'
+          let params' = fromJust $ Map.lookup inter wholeLo
+          let paramUpdates = (zip paramVars params') :: [(var, Maybe (Type atom inter))]
+          return $ (wholeVar, whole') : paramUpdates
+
   allConstraints <- foldM includeConstraint emptyConstraints (problemConstraints problem)
 
   let
@@ -301,10 +426,16 @@ solve problem = do
 
     funcEnforcers = map enforceFuncConstraint $ funcConstraints allConstraints
 
+    interactionEnforcers = map enforceInteractionConstraint $ interactionConstraints allConstraints
+
+    differenceEnforcers = map enforceDifferenceConstraint $ interactionDifferenceConstraints allConstraints
+
     allEnforcers = concat
       [ relationEnforcers
       , formulationEnforcers
       , funcEnforcers
+      , interactionEnforcers
+      , differenceEnforcers
       -- don't forget to add new enforcer types here!
       ]
 

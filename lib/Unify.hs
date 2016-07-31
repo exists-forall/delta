@@ -2,9 +2,13 @@
 
 module Unify
   ( Type (..)
+  , InteractionLower
+  , InteractionUpper
   , SpecialBounds (..)
   , Inequality (..)
   , TypeError (..)
+
+  , interactionSubtract
 
   , EQUnifier
   , LTEUnifier
@@ -23,14 +27,21 @@ import Data.Set (Set)
 
 import Data.Tuple (swap)
 import Control.Applicative ((<|>))
-
+import Data.List (foldl')
 import Data.Maybe (fromJust)
+
+import CollectionUtils (unionWithKeyM, tryExactZip, transferValues)
+import qualified ComplementSet as CSet
+import ComplementSet (ComplementSet (..))
 
 data Inequality = LTE | GTE deriving (Eq, Ord, Show)
 
 flipInequality :: Inequality -> Inequality
 flipInequality LTE = GTE
 flipInequality GTE = LTE
+
+type InteractionLower atom inter = Map inter [(Maybe (Type atom inter))]
+type InteractionUpper inter = ComplementSet inter
 
 -- Technically, these are "type bounds", not "types", and "atom"s are really "atomBound"s
 -- A "Type" conceptually involves both a lower and upper bound, which are both themselves "types"
@@ -40,7 +51,7 @@ data Type atom inter
   | App (Maybe (Type atom inter)) (Maybe (Type atom inter))
   | Func SpecialBounds (Maybe (Type atom inter)) (Maybe (Type atom inter))
   | Tuple SpecialBounds (Maybe (Type atom inter)) (Maybe (Type atom inter))
-  | Interaction (Map inter [(Maybe (Type atom inter))]) (Maybe (Set inter))
+  | Interaction (InteractionLower atom inter) (InteractionUpper inter)
   | Never
   deriving (Eq, Ord, Show)
 
@@ -99,6 +110,9 @@ data TypePair atom inter
   | TwoTuples
     (SpecialBounds, Maybe (Type atom inter), Maybe (Type atom inter))
     (SpecialBounds, Maybe (Type atom inter), Maybe (Type atom inter))
+  | TwoInteractions
+    (InteractionLower atom inter, InteractionUpper inter)
+    (InteractionLower atom inter, InteractionUpper inter)
   | NeverAndType (Maybe (Type atom inter))
   | TypeAndNever (Maybe (Type atom inter))
 
@@ -128,6 +142,9 @@ data Unifier err bound = Unifier
 data TypeError err atom inter
   = AtomError err
   | StructureMismatch (Type atom inter) (Type atom inter)
+  | InteractionArityMismatch -- TODO: Should probably specify the `inter`, not just its arguments
+    [Maybe (Type atom inter)]
+    [Maybe (Type atom inter)]
   | NotNeverConvertible (Type atom inter)
   deriving (Eq, Ord, Show)
 
@@ -180,11 +197,37 @@ structureUnify (Just (Tuple sBounds1 fst1 snd1)) Nothing =
 structureUnify Nothing (Just (Tuple sBounds2 fst2 snd2)) =
   Right (Just (TwoTuples (SpecialBounds False False, Nothing, Nothing) (sBounds2, fst2, snd2)))
 
+structureUnify (Just (Interaction lo1 hi1)) (Just (Interaction lo2 hi2)) =
+  Right (Just (TwoInteractions (lo1, hi1) (lo2, hi2)))
+
+structureUnify (Just (Interaction lo1 hi1)) Nothing =
+  Right (Just (TwoInteractions (lo1, hi1) (Map.empty, Excluded Set.empty)))
+
+structureUnify Nothing (Just (Interaction lo2 hi2)) =
+  Right (Just (TwoInteractions (Map.empty, Excluded Set.empty) (lo2, hi2)))
+
 structureUnify (Just bound1) (Just bound2) = Left (StructureMismatch bound1 bound2)
 
 liftAtomUnifier :: forall err atom inter. (Ord inter) => Unifier err atom -> Unifier (TypeError err atom inter) (Type atom inter)
 liftAtomUnifier atomUnifier =
   let
+    unifyInteractionLowers ::
+      InteractionLower atom inter ->
+      InteractionLower atom inter ->
+      Either (TypeError err atom inter) (InteractionLower atom inter)
+
+    unifyInteractionLowers lo1 lo2 = unionWithKeyM (const typeUnifyListsEQ) lo1 lo2
+
+    typeUnifyListsEQ ::
+      [(Maybe (Type atom inter))] ->
+      [(Maybe (Type atom inter))] ->
+      Either (TypeError err atom inter) [(Maybe (Type atom inter))]
+
+    typeUnifyListsEQ xs1 xs2 =
+      case tryExactZip xs1 xs2 of
+        Just pairs -> mapM (uncurry typeUnifyEQ) pairs
+        Nothing -> Left $ InteractionArityMismatch xs1 xs2
+
     typeUnifyEQ :: EQUnifier (TypeError err atom inter) (Type atom inter)
     typeUnifyEQ (Just bound1) (Just bound2) =
       case (bound1, bound2) of
@@ -207,6 +250,11 @@ liftAtomUnifier atomUnifier =
           fstBound <- typeUnifyEQ fst1 fst2
           sndBound <- typeUnifyEQ snd1 snd2
           return (Just (Tuple sBounds fstBound sndBound))
+
+        (Interaction lo1 hi1, Interaction lo2 hi2) -> do
+          lo <- unifyInteractionLowers lo1 lo2
+          let hi = CSet.intersection hi1 hi2
+          return (Just (Interaction lo hi))
 
         (Never, Never) -> Right (Just Never)
         (t, Never) ->
@@ -243,6 +291,12 @@ liftAtomUnifier atomUnifier =
           (snd1', snd2') <- typeUnifyLTE snd1 snd2
           return (Just (Tuple sBounds1' fst1' snd1'), Just (Tuple sBounds2' fst2' snd2'))
 
+        Just (TwoInteractions (lo1, hi1) (lo2, hi2)) -> do
+          let hi1' = CSet.intersection hi1 hi2
+          lo2' <- unifyInteractionLowers lo1 lo2
+          let lo1' = transferValues lo2' lo1
+          return (Just (Interaction lo1' hi1'), Just (Interaction lo2' hi2))
+
         Just (NeverAndType _) -> Right (bound1, bound2) -- `∀ τ. ⊥ ≤ τ`, so do nothing
         Just (TypeAndNever t) ->
           if lowerBound t
@@ -273,6 +327,15 @@ liftAtomUnifier atomUnifier =
           fst2' <- typeUnifyAsym inequality fst1 fst2
           snd2' <- typeUnifyAsym inequality snd1 snd2
           return (Just (Tuple sBounds2' fst2' snd2'))
+
+        Just (TwoInteractions (lo1, hi1) (lo2, hi2)) ->
+          case inequality of
+            LTE -> do
+              let lo2' = Map.unionWith const lo1 lo2
+              return (Just (Interaction lo2' hi2))
+            GTE -> do
+              let hi2' = CSet.intersection hi1 hi2
+              return (Just (Interaction lo2 hi2'))
 
         Just (NeverAndType t) ->
           case inequality of
@@ -306,6 +369,9 @@ liftAtomUnifier atomUnifier =
     lowerBound (Just (Tuple sBounds _ _)) =
       constrainedLo sBounds
 
+    lowerBound (Just (Interaction _ _)) =
+      False
+
     lowerBound (Just Never) = False
   in
     Unifier
@@ -314,3 +380,14 @@ liftAtomUnifier atomUnifier =
       , unifyAsym = typeUnifyAsym
       , hasLowerBound = lowerBound
       }
+
+interactionSubtract ::
+  (Ord inter) =>
+  Set inter ->
+  (InteractionLower atom inter, InteractionUpper inter) ->
+  (InteractionLower atom inter, InteractionUpper inter)
+
+interactionSubtract excluded (lo, hi) =
+  ( foldl' (flip Map.delete) lo excluded
+  , CSet.intersection hi (Excluded excluded)
+  )

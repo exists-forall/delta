@@ -49,6 +49,10 @@ data PolyType
     { first_type :: PolyType
     , second_type :: PolyType
     }
+  | InteractionType
+    { known_interactions :: [(InteractionIdent, [PolyType])]
+    , unknown_interactions :: [BoundVar]
+    }
   | NeverType
   deriving (Generic, Eq, Ord, Show, ToJSON, FromJSON)
 
@@ -104,6 +108,9 @@ data TypeSolution
   | TupleTypeSolution
     { first_solution :: TypeSolution
     , second_solution :: TypeSolution
+    }
+  | InteractionTypeSolution
+    { interaction_solutions :: [(InteractionIdent, [TypeSolution])]
     }
   | NeverTypeSolution
   deriving (Generic, Eq, Ord, Show, ToJSON, FromJSON)
