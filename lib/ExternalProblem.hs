@@ -51,7 +51,7 @@ data PolyType
     }
   | InteractionType
     { known_interactions :: [(InteractionIdent, [PolyType])]
-    , unknown_interactions :: [BoundVar]
+    , rest_interactions :: Maybe BoundVar
     }
   | NeverType
   deriving (Generic, Eq, Ord, Show, ToJSON, FromJSON)
@@ -83,6 +83,11 @@ data Constraint
     { tuple_var :: TypeVar
     , first_var :: TypeVar
     , second_var :: TypeVar
+    }
+  | InteractionEqualityConstraint
+    { interaction_var :: TypeVar
+    , interactions :: [(InteractionIdent, [TypeVar])]
+    , rest_interactions_var :: Maybe TypeVar
     }
   deriving (Generic, Eq, Ord, Show, ToJSON, FromJSON)
 

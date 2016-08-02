@@ -13,6 +13,9 @@ import TypeInfer
 import qualified Unify (TypeError (AtomError))
 import Unify hiding (AtomError)
 
+import qualified ComplementSet as CSet
+import ComplementSet (ComplementSet (..))
+
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -161,6 +164,26 @@ convertConstraint ctx (External.InstantiationConstraint externVar polyType) =
       let constraint = FormulationConstraint var TupleOf fstVar sndVar
       return (constraint : (fstConstraints ++ sndConstraints), var)
 
+    instantiate (External.InteractionType known rest) = do
+      knownInstantiations <- mapM (mapM (mapM instantiate)) known -- uses evil tuple Foldable and Functor instances!
+      let subConstraints = concatMap (concatMap fst . snd) knownInstantiations
+      var <- mintVar
+      let
+        interConstraints =
+          map
+            (\(inter, paramInstantiations) ->
+              let paramVars = map snd paramInstantiations
+              in InteractionConstraint var inter paramVars)
+            knownInstantiations
+
+        inters = Set.fromList (map fst known)
+
+        extraConstraints = case rest of
+          Just restVar -> [InteractionDifferenceConstraint var inters (QuantifiedVar externVar restVar)]
+          Nothing -> [BoundConstraint var (Interaction Map.empty (Included inters))]
+
+      return (extraConstraints ++ interConstraints ++ subConstraints, var)
+
     instantiate External.NeverType = do
       var <- mintVar
       return ([BoundConstraint var Never], var)
@@ -186,6 +209,22 @@ convertConstraint _ (External.FunctionEqualityConstraint funcVar argVar retVar) 
 convertConstraint _ (External.TupleEqualityConstraint tupleVar fstVar sndVar) =
   [FormulationConstraint (ExternalVar tupleVar) TupleOf (ExternalVar fstVar) (ExternalVar sndVar)]
 
+convertConstraint _ (External.InteractionEqualityConstraint var inters rest) =
+  let
+    interConstraints =
+      map
+        (\(inter, paramVars) ->
+          InteractionConstraint (ExternalVar var) inter (map ExternalVar paramVars))
+        inters
+
+    intersSet = Set.fromList (map fst inters)
+
+    extraConstraints = case rest of
+      Just restVar -> [InteractionDifferenceConstraint (ExternalVar var) intersSet (ExternalVar restVar)]
+      Nothing -> [BoundConstraint (ExternalVar var) (Interaction Map.empty (Included intersSet))]
+  in
+    interConstraints ++ extraConstraints
+
 constraintExternalVars :: External.Constraint -> [External.TypeVar]
 constraintExternalVars (External.InstantiationConstraint var _) = [var]
 constraintExternalVars (External.SubtypeConstraint var1 var2) = [var1, var2]
@@ -193,6 +232,8 @@ constraintExternalVars (External.ExactEqualityConstraint var1 var2) = [var1, var
 constraintExternalVars (External.TypeApplicationEqualityConstraint var1 var2 var3) = [var1, var2, var3]
 constraintExternalVars (External.FunctionEqualityConstraint var1 var2 var3) = [var1, var2, var3]
 constraintExternalVars (External.TupleEqualityConstraint var1 var2 var3) = [var1, var2, var3]
+constraintExternalVars (External.InteractionEqualityConstraint var inters (Just restVar)) = var : restVar : concatMap snd inters
+constraintExternalVars (External.InteractionEqualityConstraint var inters Nothing) = var : concatMap snd inters
 
 externalVarOf :: TypeVar -> External.TypeVar
 externalVarOf (ExternalVar var) = var
@@ -204,10 +245,16 @@ relevantVars (BoundConstraint var _) = [externalVarOf var]
 relevantVars (RelationConstraint var1 _ var2) = map externalVarOf [var1, var2]
 relevantVars (FormulationConstraint var1 _ var2 var3) = map externalVarOf [var1, var2, var3]
 relevantVars (FuncConstraint var1 (var2, var3)) = map externalVarOf [var1, var2, var3]
+relevantVars (InteractionConstraint var _ paramVars) = map externalVarOf (var : paramVars)
+relevantVars (InteractionDifferenceConstraint var _ restVar) = map externalVarOf [var, restVar]
 
 formatAtomIdent :: AtomIdent -> Text
 formatAtomIdent (External.AtomIdent []) = "{empty path}"
 formatAtomIdent (External.AtomIdent path) = last path
+
+formatInterIdent :: InterIdent -> Text
+formatInterIdent (External.InteractionIdent []) = "{empty path}"
+formatInterIdent (External.InteractionIdent path) = last path
 
 formatNode :: Node s AtomIdent -> Text
 formatNode node =
@@ -233,6 +280,17 @@ formatType (Just (Func _ argType retType)) =
 formatType (Just (Tuple _ fstType sndType)) =
   formatType fstType <> "," <> formatType sndType
 
+formatType (Just (Interaction lo _)) =
+  if Map.null lo
+    then "Pure"
+    else
+      T.intercalate " | " $
+        map
+          (\(inter, params) ->
+            let formattedParams = map (\param -> "<" <> formatType param <> ">") params
+            in formatInterIdent inter <> mconcat formattedParams)
+          (Map.toList lo)
+
 formatType (Just Never) = "Never"
 
 formatType Nothing = "{unconstrainted type}"
@@ -247,6 +305,13 @@ formatTypeError (StructureMismatch t1 t2) =
 
 formatTypeError (NotNeverConvertible t1) =
   "Type `" <> formatType (Just t1) <> "` is not convertible to `Never`"
+
+formatTypeError (InteractionArityMismatch params1 params2) =
+    -- TODO: This definitely needs to be more helpful!  It is very hard for a user to localize this error
+    -- It's a rare enough error, though, that making it more helpful isn't the highest priority.
+    "I got a conflicting number of arguments for the parameters on two related interactions.\n" <>
+    "One seems to take the arguments:\n\t" <> T.intercalate ", " (map formatType params1) <> "\n" <>
+    "But the other seems to take the arguments:\n\t" <> T.intercalate ", " (map formatType params2)
 
 convertError ::
   InferenceError TypeVar AtomError (AtomBound s) InterIdent ->
@@ -281,6 +346,23 @@ convertError (NotFunction var badType) =
 
 convertError RecursiveType =
   ("I'm inferring some weird, infinitely-deep types.  This is usually a problem with recursion.", [])
+
+convertError (NotInteraction var badType) =
+  let
+    msg =
+      "I expected the type here to be an interaction, but instead I found this type: " <>
+      formatType badType
+  in
+    (msg, [externalVarOf var])
+
+convertError (InteractionCantContain var disallowed badType) =
+  let
+    msg =
+      "I expected the interaction type here *not* to contain:\n" <>
+      "\t" <> T.intercalate " or " (map formatInterIdent (Set.toList disallowed)) <> "\n" <>
+      "But instead I inferred this type: " <> formatType badType
+  in
+    (msg, [externalVarOf var])
 
 convertSolution :: Maybe (Type (AtomBound s) InterIdent) -> Either Text External.TypeSolution
 
@@ -333,6 +415,26 @@ convertSolution (Just (Tuple sBounds fstType sndType)) =
       return $ External.TupleTypeSolution fstSolution sndSolution
     else
       return External.NeverTypeSolution
+
+convertSolution t@(Just (Interaction lo hi)) =
+  if all (`CSet.member` hi) (Map.keys lo)
+    then do
+      solutions <- mapM (mapM convertSolution) lo
+      return $ External.InteractionTypeSolution (Map.toList solutions)
+    else
+      let
+        contextMsg = case hi of
+          Included included ->
+            if Set.null included
+              then "In a pure context"
+              else
+                "In a context which only allows:\n\t" <>
+                T.intercalate ", " (map formatInterIdent (Set.toList included))
+          Excluded excluded ->
+            "In a context which does not allow:\n\t" <>
+            T.intercalate ", " (map formatInterIdent (Set.toList excluded))
+      in Left $
+        "I inferred the following interaction:\n\t" <> formatType t <> "\n" <> contextMsg
 
 convertSolution (Just Never) =
   return External.NeverTypeSolution
