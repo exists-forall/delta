@@ -22,6 +22,12 @@ v = TypeVar
 q :: Text -> PolyType
 q = QuantifiedVariable . BoundVar
 
+pureType :: PolyType
+pureType = InteractionType [] Nothing
+
+pureSolution :: TypeSolution
+pureSolution = InteractionTypeSolution []
+
 -- More tests to come!
 -- This is far from covering the entirety of the API, let alone the full range of its behaviors
 
@@ -37,9 +43,10 @@ wellFormedProblems = Problem
       [ InstantiationConstraint (v "swap") $
         FunctionType
           (TupleType (q "a") (q "b"))
+          pureType
           (TupleType (q "b") (q "a"))
       , SubtypeConstraint (v "swap") (v "func")
-      , FunctionEqualityConstraint (v "func") (v "arg") (v "ret")
+      , FunctionEqualityConstraint (v "func") (v "arg") (v "inter") (v "ret")
       , InstantiationConstraint (v "x") $ AtomType (a "Bool")
       , InstantiationConstraint (v "y") $ AtomType (a "String")
       , TupleEqualityConstraint (v "tuple") (v "x") (v "y")
@@ -48,12 +55,12 @@ wellFormedProblems = Problem
 
     , (,) "id test"
       [ InstantiationConstraint (v "id") $
-        FunctionType (q "a") (q "a")
+        FunctionType (q "a") pureType (q "a")
       , InstantiationConstraint (v "x") $
         AtomType (a "T1")
       , SubtypeConstraint (v "x") (v "arg")
       , SubtypeConstraint (v "id") (v "func")
-      , FunctionEqualityConstraint (v "func") (v "arg") (v "ret")
+      , FunctionEqualityConstraint (v "func") (v "arg") (v "inter") (v "ret")
       , InstantiationConstraint (v "ret") $ AtomType (a "T2")
       ]
 
@@ -61,15 +68,16 @@ wellFormedProblems = Problem
       [ InstantiationConstraint (v "map") $
         FunctionType
           (TupleType
-            (FunctionType (q "a") (q "b"))
+            (FunctionType (q "a") pureType (q "b"))
             (TypeApplication (AtomType (a "Seq")) (q "a"))
           )
+          pureType
           (TypeApplication (AtomType (a "Seq")) (q "b"))
       , SubtypeConstraint (v "map") (v "func")
-      , FunctionEqualityConstraint (v "func") (v "arg") (v "ret")
+      , FunctionEqualityConstraint (v "func") (v "arg") (v "inter") (v "ret")
       , SubtypeConstraint (v "params") (v "arg")
       , TupleEqualityConstraint (v "params") (v "lambda") (v "seq")
-      , FunctionEqualityConstraint (v "lambda") (v "lamArg") (v "lamRet")
+      , FunctionEqualityConstraint (v "lambda") (v "lamArg") (v "lamInter") (v "lamRet")
       , TupleEqualityConstraint (v "lamRet") (v "lamArg") (v "lamArg")
 
       , InstantiationConstraint (v "seq") $
@@ -78,9 +86,9 @@ wellFormedProblems = Problem
 
     , (,) "contravariance test"
       [ InstantiationConstraint (v "f1") $
-        (FunctionType (AtomType (a "T3")) (AtomType (a "T1")))
+        (FunctionType (AtomType (a "T3")) pureType (AtomType (a "T1")))
       , InstantiationConstraint (v "f3") $
-        (FunctionType (AtomType (a "T2")) (AtomType (a "T3")))
+        (FunctionType (AtomType (a "T2")) pureType (AtomType (a "T3")))
       , SubtypeConstraint (v "f1") (v "f2")
       , SubtypeConstraint (v "f2") (v "f3")
       ]
@@ -136,18 +144,21 @@ expectedResults = Results
                     [ ( "f1"
                       , FunctionTypeSolution
                           { argument_solution = AtomTypeSolution (AtomIdent [ "T3" ])
+                          , interaction_solution = pureSolution
                           , return_sloution = AtomTypeSolution (AtomIdent [ "T1" ])
                           }
                       )
                     , ( "f2"
                       , FunctionTypeSolution
                           { argument_solution = AtomTypeSolution (AtomIdent [ "T2" ])
+                          , interaction_solution = pureSolution
                           , return_sloution = AtomTypeSolution (AtomIdent [ "T1" ])
                           }
                       )
                     , ( "f3"
                       , FunctionTypeSolution
                           { argument_solution = AtomTypeSolution (AtomIdent [ "T2" ])
+                          , interaction_solution = pureSolution
                           , return_sloution = AtomTypeSolution (AtomIdent [ "T3" ])
                           }
                       )
@@ -162,16 +173,19 @@ expectedResults = Results
                     , ( "func"
                       , FunctionTypeSolution
                           { argument_solution = AtomTypeSolution (AtomIdent [ "T1" ])
+                          , interaction_solution = pureSolution
                           , return_sloution = AtomTypeSolution (AtomIdent [ "T2" ])
                           }
                       )
                     , ( "id"
                       , FunctionTypeSolution
                           { argument_solution = AtomTypeSolution (AtomIdent [ "T1" ])
+                          , interaction_solution = pureSolution
                           , return_sloution = AtomTypeSolution (AtomIdent [ "T1" ])
                           }
                       )
                     , ( "ret" , AtomTypeSolution (AtomIdent [ "T2" ]) )
+                    , ( "inter", pureSolution )
                     , ( "x" , AtomTypeSolution (AtomIdent [ "T1" ]) )
                     ]
               }
@@ -200,6 +214,7 @@ expectedResults = Results
                                 { first_solution = AtomTypeSolution (AtomIdent [ "Bool" ])
                                 , second_solution = AtomTypeSolution (AtomIdent [ "String" ])
                                 }
+                          , interaction_solution = pureSolution
                           , return_sloution =
                               TupleTypeSolution
                                 { first_solution = AtomTypeSolution (AtomIdent [ "String" ])
@@ -207,6 +222,7 @@ expectedResults = Results
                                 }
                           }
                       )
+                    , ( "inter", pureSolution )
                     , ( "ret"
                       , TupleTypeSolution
                           { first_solution = AtomTypeSolution (AtomIdent [ "String" ])
@@ -220,6 +236,7 @@ expectedResults = Results
                                 { first_solution = AtomTypeSolution (AtomIdent [ "Bool" ])
                                 , second_solution = AtomTypeSolution (AtomIdent [ "String" ])
                                 }
+                          , interaction_solution = pureSolution
                           , return_sloution =
                               TupleTypeSolution
                                 { first_solution = AtomTypeSolution (AtomIdent [ "String" ])

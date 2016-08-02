@@ -33,7 +33,7 @@ data Constraint var atom inter
   = BoundConstraint var (Type atom inter)
   | RelationConstraint var Relation var
   | FormulationConstraint var Formulation var var
-  | FuncConstraint var (var, var)
+  | FuncConstraint var (var, var, var)
   | InteractionConstraint var inter [var] -- This is an *inequality* constraint of the form i<x> ≤ v
   | InteractionDifferenceConstraint var (Set inter) var
   deriving (Eq, Ord, Show)
@@ -61,7 +61,7 @@ data ConsolidatedConstraints var err atom inter = ConsolidatedConstraints
   { boundConstraints :: Map var (Type atom inter)
   , relationConstraints :: Map (OrderedPair var) Relation
   , formulationConstraints :: [(var, Formulation, var, var)]
-  , funcConstraints :: [(var, (var, var))]
+  , funcConstraints :: [(var, (var, var, var))]
   , interactionConstraints :: [(var, inter, [var])]
   , interactionDifferenceConstraints :: [(var, Set inter, var)]
   }
@@ -89,8 +89,9 @@ structuralSizeRelations (FormulationConstraint whole _ part1 part2) =
   [ whole `StructurallyLargerThan` part1
   , whole `StructurallyLargerThan` part2
   ]
-structuralSizeRelations (FuncConstraint func (arg, ret)) =
+structuralSizeRelations (FuncConstraint func (arg, inter, ret)) =
   [ func `StructurallyLargerThan` arg
+  , func `StructurallyLargerThan` inter
   , func `StructurallyLargerThan` ret
   ]
 structuralSizeRelations (InteractionConstraint var _ params) =
@@ -129,9 +130,9 @@ joinFormulation :: Formulation -> (Maybe (Type atom inter), Maybe (Type atom int
 joinFormulation AppOf = Just . uncurry App
 joinFormulation TupleOf = Just . uncurry (Tuple (SpecialBounds True True))
 
-funcComponents :: Maybe (Type atom inter) -> Maybe (SpecialBounds, Maybe (Type atom inter), Maybe (Type atom inter))
-funcComponents Nothing = Just (SpecialBounds False False, Nothing, Nothing)
-funcComponents (Just (Func sBounds arg ret)) = Just (sBounds, arg, ret)
+funcComponents :: Maybe (Type atom inter) -> Maybe (SpecialBounds, Maybe (Type atom inter), Maybe (Type atom inter), Maybe (Type atom inter))
+funcComponents Nothing = Just (SpecialBounds False False, Nothing, Nothing, Nothing)
+funcComponents (Just (Func sBounds arg inter ret)) = Just (sBounds, arg, inter, ret)
 funcComponents (Just _) = Nothing
 
 interactionComponents :: Maybe (Type atom inter) -> Maybe (InteractionLower atom inter, InteractionUpper inter)
@@ -197,10 +198,10 @@ solve problem = do
       in
         Right constraints { formulationConstraints = newFormulations }
 
-    includeConstraint constraints (FuncConstraint var1 (var2, var3)) =
+    includeConstraint constraints (FuncConstraint var1 (argVar, interVar, retVar)) =
       let
         oldFuncConstraints = funcConstraints constraints
-        newFuncConstraints = (var1, (var2, var3)) : oldFuncConstraints
+        newFuncConstraints = (var1, (argVar, interVar, retVar)) : oldFuncConstraints
       in
         Right constraints { funcConstraints = newFuncConstraints }
 
@@ -297,37 +298,39 @@ solve problem = do
     -- Currently largely redundant with formulation constraints, but will need to be treated
     -- separately when interactions are implemented, so we may as well just separate it now.
     enforceFuncConstraint ::
-      (var, (var, var)) ->
+      (var, (var, var, var)) ->
       Prop.ConstraintEnforcer
         var
         (Maybe (Type atom inter))
         (InferenceError var err atom inter)
 
-    enforceFuncConstraint (funcVar, (argVar, retVar)) =
+    enforceFuncConstraint (funcVar, (argVar, interVar, retVar)) =
       let
-        constraint = FuncConstraint funcVar (argVar, retVar)
-        go (_, Unchanged) (_, Unchanged) (_, Unchanged) = Right []
-        go (funcBound, funcChange) (bound1, change1) (bound2, change2) = do
-          (_, part1, part2) <- case funcComponents funcBound of
+        constraint = FuncConstraint funcVar (argVar, interVar, retVar)
+        go (_, Unchanged) (_, Unchanged) (_, Unchanged) (_, Unchanged) = Right []
+        go (funcBound, funcChange) (argBound, argChange) (interBound, interChange) (retBound, retChange) = do
+          (_, argPart, interPart, retPart) <- case funcComponents funcBound of
             Just components -> Right components
             Nothing -> Left $ NotFunction funcVar funcBound
-          part1' <- markError constraint $
-            enforceEQ (part1, funcChange) (bound1, change1)
-          part2' <- markError constraint $
-            enforceEQ (part2, funcChange) (bound2, change2)
+          argPart' <- markError constraint $
+            enforceEQ (argPart, funcChange) (argBound, argChange)
+          interPart' <- markError constraint $
+            enforceEQ (interPart, funcChange) (interBound, interChange)
+          retPart' <- markError constraint $
+            enforceEQ (retPart, funcChange) (retBound, retChange)
           let
-            newFunc = Just $ Func (SpecialBounds True True) part1' part2'
+            newFunc = Just $ Func (SpecialBounds True True) argPart' interPart' retPart'
             funcUpdate =
-              if change1 == Changed || change2 == Changed
+              if argChange == Changed || interChange == Changed || retChange == Changed
                 then [(funcVar, newFunc)]
                 else []
             boundUpdates =
               if funcChange == Changed
-                then [(argVar, part1'), (retVar, part2')]
+                then [(argVar, argPart'), (interVar, interPart'), (retVar, retPart')]
                 else []
           return $ funcUpdate ++ boundUpdates
       in
-        go <$> queryVar funcVar <*> queryVar argVar <*> queryVar retVar
+        go <$> queryVar funcVar <*> queryVar argVar <*> queryVar interVar <*> queryVar retVar
 
     enforceDifferenceConstraint ::
       (var, Set inter, var) ->

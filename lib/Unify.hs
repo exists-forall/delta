@@ -49,7 +49,7 @@ type InteractionUpper inter = ComplementSet inter
 data Type atom inter
   = Atom atom
   | App (Maybe (Type atom inter)) (Maybe (Type atom inter))
-  | Func SpecialBounds (Maybe (Type atom inter)) (Maybe (Type atom inter))
+  | Func SpecialBounds (Maybe (Type atom inter)) (Maybe (Type atom inter)) (Maybe (Type atom inter))
   | Tuple SpecialBounds (Maybe (Type atom inter)) (Maybe (Type atom inter))
   | Interaction (InteractionLower atom inter) (InteractionUpper inter)
   | Never
@@ -105,8 +105,8 @@ data TypePair atom inter
   = TwoAtoms (Maybe atom) (Maybe atom)
   | TwoApps (Maybe (Type atom inter), Maybe (Type atom inter)) (Maybe (Type atom inter), Maybe (Type atom inter))
   | TwoFuncs
-    (SpecialBounds, Maybe (Type atom inter), Maybe (Type atom inter))
-    (SpecialBounds, Maybe (Type atom inter), Maybe (Type atom inter))
+    (SpecialBounds, Maybe (Type atom inter), Maybe (Type atom inter), Maybe (Type atom inter))
+    (SpecialBounds, Maybe (Type atom inter), Maybe (Type atom inter), Maybe (Type atom inter))
   | TwoTuples
     (SpecialBounds, Maybe (Type atom inter), Maybe (Type atom inter))
     (SpecialBounds, Maybe (Type atom inter), Maybe (Type atom inter))
@@ -179,14 +179,14 @@ structureUnify (Just (App head1 param1)) (Just (App head2 param2)) = Right (Just
 structureUnify (Just (App head1 param1)) Nothing = Right (Just (TwoApps (head1, param1) (Nothing, Nothing)))
 structureUnify Nothing (Just (App head2 param2)) = Right (Just (TwoApps (Nothing, Nothing) (head2, param2)))
 
-structureUnify (Just (Func sBounds1 arg1 ret1)) (Just (Func sBounds2 arg2 ret2)) =
-  Right (Just (TwoFuncs (sBounds1, arg1, ret1) (sBounds2, arg2, ret2)))
+structureUnify (Just (Func sBounds1 arg1 inter1 ret1)) (Just (Func sBounds2 arg2 inter2 ret2)) =
+  Right (Just (TwoFuncs (sBounds1, arg1, inter1, ret1) (sBounds2, arg2, inter2, ret2)))
 
-structureUnify (Just (Func sBounds1 arg1 ret1)) Nothing =
-  Right (Just (TwoFuncs (sBounds1, arg1, ret1) (SpecialBounds False False, Nothing, Nothing)))
+structureUnify (Just (Func sBounds1 arg1 inter1 ret1)) Nothing =
+  Right (Just (TwoFuncs (sBounds1, arg1, inter1, ret1) (SpecialBounds False False, Nothing, Nothing, Nothing)))
 
-structureUnify Nothing (Just (Func sBounds2 arg2 ret2)) =
-  Right (Just (TwoFuncs (SpecialBounds False False, Nothing, Nothing) (sBounds2, arg2, ret2)))
+structureUnify Nothing (Just (Func sBounds2 arg2 inter2 ret2)) =
+  Right (Just (TwoFuncs (SpecialBounds False False, Nothing, Nothing, Nothing) (sBounds2, arg2, inter2, ret2)))
 
 structureUnify (Just (Tuple sBounds1 fst1 snd1)) (Just (Tuple sBounds2 fst2 snd2)) =
   Right (Just (TwoTuples (sBounds1, fst1, snd1) (sBounds2, fst2, snd2)))
@@ -239,11 +239,12 @@ liftAtomUnifier atomUnifier =
           paramBound <- typeUnifyEQ param1 param2
           return (Just (App headBound paramBound))
 
-        (Func sBounds1 arg1 ret1, Func sBounds2 arg2 ret2) -> do
+        (Func sBounds1 arg1 inter1 ret1, Func sBounds2 arg2 inter2 ret2) -> do
           let sBounds = specialBoundsEQ sBounds1 sBounds2
           arg <- typeUnifyEQ arg1 arg2
+          inter <- typeUnifyEQ inter1 inter2
           ret <- typeUnifyEQ ret1 ret2
-          return (Just (Func sBounds arg ret))
+          return (Just (Func sBounds arg inter ret))
 
         (Tuple sBounds1 fst1 snd1, Tuple sBounds2 fst2 snd2) -> do
           let sBounds = specialBoundsEQ sBounds1 sBounds2
@@ -279,11 +280,12 @@ liftAtomUnifier atomUnifier =
           param' <- (typeUnifyEQ param1 param2) -- type constructors are invariant in their type parameter
           return (Just (App head1' param'), Just (App head2' param'))
 
-        Just (TwoFuncs (sBounds1, arg1, ret1) (sBounds2, arg2, ret2)) -> do
+        Just (TwoFuncs (sBounds1, arg1, inter1, ret1) (sBounds2, arg2, inter2, ret2)) -> do
           let (sBounds1', sBounds2') = specialBoundsLTE sBounds1 sBounds2
           (arg1', arg2') <- fmap swap (typeUnifyLTE arg2 arg1) -- functions are contravariant in their argument
+          (inter1', inter2') <- typeUnifyLTE inter1 inter2
           (ret1', ret2') <- typeUnifyLTE ret1 ret2
-          return (Just (Func sBounds1' arg1' ret1'), Just (Func sBounds2' arg2' ret2'))
+          return (Just (Func sBounds1' arg1' inter1' ret1'), Just (Func sBounds2' arg2' inter2' ret2'))
 
         Just (TwoTuples (sBounds1, fst1, snd1) (sBounds2, fst2, snd2)) -> do
           let (sBounds1', sBounds2') = specialBoundsLTE sBounds1 sBounds2
@@ -316,11 +318,12 @@ liftAtomUnifier atomUnifier =
           head2' <- typeUnifyAsym inequality head1 head2
           return (Just (App head2' param1))
 
-        Just (TwoFuncs (sBounds1, arg1, ret1) (sBounds2, arg2, ret2)) -> do
+        Just (TwoFuncs (sBounds1, arg1, inter1, ret1) (sBounds2, arg2, inter2, ret2)) -> do
           let sBounds2' = specialBoundsAsym inequality sBounds1 sBounds2
           arg2' <- typeUnifyAsym (flipInequality inequality) arg1 arg2
+          inter2' <- typeUnifyAsym inequality inter1 inter2
           ret2' <- typeUnifyAsym inequality ret1 ret2
-          return (Just (Func sBounds2' arg2' ret2'))
+          return (Just (Func sBounds2' arg2' inter2' ret2'))
 
         Just (TwoTuples (sBounds1, fst1, snd1) (sBounds2, fst2, snd2)) -> do
           let sBounds2' = specialBoundsAsym inequality sBounds1 sBounds2
@@ -363,7 +366,7 @@ liftAtomUnifier atomUnifier =
     lowerBound (Just (App headBound _)) =
       lowerBound headBound
 
-    lowerBound (Just (Func sBounds _ _)) =
+    lowerBound (Just (Func sBounds _ _ _)) =
       constrainedLo sBounds
 
     lowerBound (Just (Tuple sBounds _ _)) =

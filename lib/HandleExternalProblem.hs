@@ -150,12 +150,13 @@ convertConstraint ctx (External.InstantiationConstraint externVar polyType) =
       let constraint = FormulationConstraint var AppOf headVar paramVar
       return (constraint : (headConstraints ++ paramConstraints), var)
 
-    instantiate (External.FunctionType argType retType) = do
+    instantiate (External.FunctionType argType interType retType) = do
       (argConstraints, argVar) <- instantiate argType
+      (interConstraints, interVar) <- instantiate interType
       (retConstraints, retVar) <- instantiate retType
       var <- mintVar
-      let constraint = FuncConstraint var (argVar, retVar)
-      return (constraint : (argConstraints ++ retConstraints), var)
+      let constraint = FuncConstraint var (argVar, interVar, retVar)
+      return (constraint : (argConstraints ++ interConstraints ++ retConstraints), var)
 
     instantiate (External.TupleType fstType sndType) = do
       (fstConstraints, fstVar) <- instantiate fstType
@@ -203,8 +204,8 @@ convertConstraint _ (External.ExactEqualityConstraint externVar1 externVar2) =
 convertConstraint _ (External.TypeApplicationEqualityConstraint appliedVar headVar paramVar) =
   [FormulationConstraint (ExternalVar appliedVar) AppOf (ExternalVar headVar) (ExternalVar paramVar)]
 
-convertConstraint _ (External.FunctionEqualityConstraint funcVar argVar retVar) =
-  [FuncConstraint (ExternalVar funcVar) (ExternalVar argVar, ExternalVar retVar)]
+convertConstraint _ (External.FunctionEqualityConstraint funcVar argVar interVar retVar) =
+  [FuncConstraint (ExternalVar funcVar) (ExternalVar argVar, ExternalVar interVar, ExternalVar retVar)]
 
 convertConstraint _ (External.TupleEqualityConstraint tupleVar fstVar sndVar) =
   [FormulationConstraint (ExternalVar tupleVar) TupleOf (ExternalVar fstVar) (ExternalVar sndVar)]
@@ -230,7 +231,7 @@ constraintExternalVars (External.InstantiationConstraint var _) = [var]
 constraintExternalVars (External.SubtypeConstraint var1 var2) = [var1, var2]
 constraintExternalVars (External.ExactEqualityConstraint var1 var2) = [var1, var2]
 constraintExternalVars (External.TypeApplicationEqualityConstraint var1 var2 var3) = [var1, var2, var3]
-constraintExternalVars (External.FunctionEqualityConstraint var1 var2 var3) = [var1, var2, var3]
+constraintExternalVars (External.FunctionEqualityConstraint var1 var2 var3 var4) = [var1, var2, var3, var4]
 constraintExternalVars (External.TupleEqualityConstraint var1 var2 var3) = [var1, var2, var3]
 constraintExternalVars (External.InteractionEqualityConstraint var inters (Just restVar)) = var : restVar : concatMap snd inters
 constraintExternalVars (External.InteractionEqualityConstraint var inters Nothing) = var : concatMap snd inters
@@ -244,7 +245,7 @@ relevantVars :: Constraint TypeVar (AtomBound s) InterIdent -> [External.TypeVar
 relevantVars (BoundConstraint var _) = [externalVarOf var]
 relevantVars (RelationConstraint var1 _ var2) = map externalVarOf [var1, var2]
 relevantVars (FormulationConstraint var1 _ var2 var3) = map externalVarOf [var1, var2, var3]
-relevantVars (FuncConstraint var1 (var2, var3)) = map externalVarOf [var1, var2, var3]
+relevantVars (FuncConstraint var1 (var2, var3, var4)) = map externalVarOf [var1, var2, var3, var4]
 relevantVars (InteractionConstraint var _ paramVars) = map externalVarOf (var : paramVars)
 relevantVars (InteractionDifferenceConstraint var _ restVar) = map externalVarOf [var, restVar]
 
@@ -274,8 +275,8 @@ formatType (Just (Atom (AtomBound lo hi))) =
 formatType (Just (App headType paramType)) =
   formatType headType <> "<" <> formatType paramType <> ">"
 
-formatType (Just (Func _ argType retType)) =
-  formatType argType <> "->" <> formatType retType
+formatType (Just (Func _ argType interType retType)) =
+  formatType argType <> " ! " <> formatType interType <> " -> " <> formatType retType
 
 formatType (Just (Tuple _ fstType sndType)) =
   formatType fstType <> "," <> formatType sndType
@@ -398,12 +399,13 @@ convertSolution (Just (App headType paramType)) = do
       paramSolution <- convertSolution paramType
       return $ External.TypeApplicationSolution headSolution paramSolution
 
-convertSolution (Just (Func sBounds argType retType)) =
+convertSolution (Just (Func sBounds argType interType retType)) =
   if constrainedLo sBounds
     then do
       argSolution <- convertSolution argType
+      interSolution <- convertSolution interType
       retSolution <- convertSolution retType
-      return $ External.FunctionTypeSolution argSolution retSolution
+      return $ External.FunctionTypeSolution argSolution interSolution retSolution
     else
       return External.NeverTypeSolution
 

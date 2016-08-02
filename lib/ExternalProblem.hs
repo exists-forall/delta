@@ -43,6 +43,7 @@ data PolyType
     }
   | FunctionType
     { argument_type :: PolyType
+    , interaction_type :: PolyType
     , return_type :: PolyType
     }
   | TupleType
@@ -77,6 +78,7 @@ data Constraint
   | FunctionEqualityConstraint
     { function_var :: TypeVar
     , argument_var :: TypeVar
+    , interaction_var :: TypeVar
     , return_var :: TypeVar
     }
   | TupleEqualityConstraint
@@ -108,6 +110,7 @@ data TypeSolution
     }
   | FunctionTypeSolution
     { argument_solution :: TypeSolution
+    , interaction_solution :: TypeSolution
     , return_sloution :: TypeSolution
     }
   | TupleTypeSolution
