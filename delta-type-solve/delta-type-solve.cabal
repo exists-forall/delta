@@ -1,8 +1,8 @@
-name:                delta-type-inference
+name:                delta-type-solve
 version:             0.1.0.0
 synopsis:            Type inference and type checking for Delta
 description:         Please see README.md
-homepage:            https://github.com/SelectricSimian/delta-type-inference#readme
+homepage:            https://github.com/SelectricSimian/delta/tree/master/delta-type-solve#readme
 license:             BSD3
 license-file:        LICENSE
 author:              William Brandon
@@ -12,12 +12,12 @@ category:            Compiler
 build-type:          Simple
 cabal-version:       >=1.10
 
-executable delta-typesolve
+executable delta-type-solve
   hs-source-dirs:      exec
   main-is:             main.hs
   default-language:    Haskell2010
   build-depends:       base >= 4.7 && < 5
-                     , delta-type-inference
+                     , delta-type-solve
                      , containers
                      , text
                      , aeson
@@ -50,7 +50,7 @@ library
                      , text
                      , aeson
 
-test-suite delta-type-inference-tests
+test-suite delta-type-solve-tests
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test, lib
   main-is:             Spec.hs
