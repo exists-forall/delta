@@ -1,0 +1,36 @@
+name:                delta-parse
+version:             0.1.0.0
+synopsis:            Source code parsing for Delta
+description:         Please see README.md
+homepage:            https://github.com/SelectricSimian/delta/tree/master/delta-parse#readme
+license:             BSD3
+license-file:        LICENSE
+author:              William Brandon
+maintainer:          hypercube97@gmail.com
+copyright:           Copyright: (c) 2016 William Brandon
+category:            Compiler
+build-type:          Simple
+cabal-version:       >=1.10
+
+executable delta-parse
+  hs-source-dirs:      exec
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , delta-parse
+  default-language:    Haskell2010
+
+library
+  hs-source-dirs:      lib
+  exposed-modules:     Syntax
+  build-depends:       base >= 4.7 && < 5
+  default-language:    Haskell2010
+
+test-suite delta-parse-tests
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Spec.hs
+  build-depends:       base
+                     , delta-parse
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
