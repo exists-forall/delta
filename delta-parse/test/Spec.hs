@@ -1,2 +1,10 @@
+module Main where
+
+import qualified ParseIdentTests
+
+import Test.Hspec
+
 main :: IO ()
-main = putStrLn "Test suite not yet implemented"
+main = hspec $ do
+  describe "delta-parse" $ do
+    ParseIdentTests.test
