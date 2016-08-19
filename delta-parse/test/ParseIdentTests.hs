@@ -148,3 +148,17 @@ test = describe "ParseIdent" $ do
 
     it "rejects dot variables beginning with a slot" $
       fullParse varIdent ".() foo" `shouldSatisfy` isLeft
+
+  describe "typeIdent" $ do
+    it "parses type identifiers" $
+      fullParse typeIdent "Foo_42" `shouldBe`
+        Right (TypeIdent F [l' O, l' O, StartChar Underscore, Digit D4, Digit D2])
+
+    it "rejects type identifiers starting with a lowercase letter" $
+      fullParse typeIdent "foo_42" `shouldSatisfy` isLeft
+
+    it "rejects type identifiers starting with an underscore" $
+      fullParse typeIdent "_foo_42" `shouldSatisfy` isLeft
+
+    it "rejects type identifiers starting with a digit" $
+      fullParse typeIdent "42Foo" `shouldSatisfy` isLeft

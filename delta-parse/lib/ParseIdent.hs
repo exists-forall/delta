@@ -4,6 +4,7 @@ module ParseIdent
   ( ident
   , moduleIdent
   , varIdent
+  , typeIdent
   )
 where
 
@@ -61,3 +62,9 @@ varIdent =
     , (flip Stx.VarIdent (Stx.BodySlot Stx.EmptyTail)) <$> ident
     , try $ char '.' *> spaces *> (Stx.DotVarIdent <$> ident <*> (spaces *> varIdentTail))
     ]
+
+typeIdent :: Parser Stx.TypeIdent
+typeIdent =
+  flip label "type identifier" $
+  try $
+  Stx.TypeIdent <$> upperLetter <*> many identChar
