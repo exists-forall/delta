@@ -28,3 +28,10 @@ data Path a = Path [ModuleIdent] a deriving (Eq, Ord, Show)
 
 type VarPath = Path VarIdent
 type TypePath = Path TypeIdent
+
+data Expr
+  = Var (Path VarIdent)
+  | Unit
+  | Tuple Expr Expr
+  | Call Expr Expr
+  deriving (Eq, Ord, Show)

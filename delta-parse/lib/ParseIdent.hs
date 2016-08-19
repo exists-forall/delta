@@ -5,6 +5,7 @@ module ParseIdent
   , moduleIdent
   , varIdent
   , typeIdent
+  , path
   )
 where
 
@@ -68,3 +69,6 @@ typeIdent =
   flip label "type identifier" $
   try $
   Stx.TypeIdent <$> upperLetter <*> many identChar
+
+path :: Parser [Stx.ModuleIdent]
+path = many (try $ moduleIdent <* spaces <* char ':' <* char ':' <* spaces)
