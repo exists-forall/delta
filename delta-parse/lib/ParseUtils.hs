@@ -3,6 +3,7 @@ module ParseUtils
   , Parser
   , both
   , rangeParser
+  , fullParse
   )
 where
 
