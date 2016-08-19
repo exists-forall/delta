@@ -1,5 +1,7 @@
 module Syntax where
 
+import Text.Parsec (SourcePos)
+
 {-
 This might seem like madness, but there is an exact one-to-one correspondence between valid Delta
 identifiers and the inhabitants of this type.  This representation perfectly encodes the invariants.
@@ -34,4 +36,13 @@ data Expr
   | Unit
   | Tuple Expr Expr
   | Call Expr Expr
+  | Mark SourcePos Expr SourcePos
   deriving (Eq, Ord, Show)
+
+-- For testing purposes:
+stripMarks :: Expr -> Expr
+stripMarks (Var v) = Var v
+stripMarks Unit = Unit
+stripMarks (Tuple a b) = Tuple (stripMarks a) (stripMarks b)
+stripMarks (Call a b) = Call (stripMarks a) (stripMarks b)
+stripMarks (Mark _ e _) = stripMarks e

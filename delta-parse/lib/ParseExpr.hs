@@ -10,8 +10,11 @@ import ParseIdent
 
 import Data.Bifunctor (bimap, first)
 
+mark :: Parser Stx.Expr -> Parser Stx.Expr
+mark p = Stx.Mark <$> getPosition <*> p <*> getPosition
+
 parenthesized :: Parser Stx.Expr
-parenthesized = char '(' *> spaces *> option Stx.Unit expr <* spaces <* char ')'
+parenthesized = mark $ char '(' *> spaces *> option Stx.Unit expr <* spaces <* char ')'
 
 callTail :: Parser (Stx.VarIdentTail, [Stx.Expr])
 callTail =
@@ -30,12 +33,13 @@ callBody =
 
 callNonDot :: Parser Stx.Expr
 callNonDot =
-  assemble <$> path <*> (first <$> (Stx.VarIdent <$> ident) <*> (spaces *> callBody)) where
+  mark $ assemble <$> path <*> (first <$> (Stx.VarIdent <$> ident) <*> (spaces *> callBody)) where
   assemble varPath (varIdent, args) =
     Stx.Call (Stx.Var (Stx.Path varPath varIdent)) (foldr1 Stx.Tuple args)
 
 var :: Parser Stx.Expr
-var = Stx.Var <$> (Stx.Path <$> path <*> (flip Stx.VarIdent (Stx.BodySlot Stx.EmptyTail) <$> ident))
+var = mark $
+  Stx.Var <$> (Stx.Path <$> path <*> (flip Stx.VarIdent (Stx.BodySlot Stx.EmptyTail) <$> ident))
 
 atomicExpr :: Parser Stx.Expr
 atomicExpr = choice
@@ -64,7 +68,8 @@ dotCalls =
   were trailing spaces after the last dot call, Parsec would treat those spaces as the beginning of
   another (spurious and nonexistent) dot call, try to parse it, and fail.
   -}
-  foldl applyDotCall <$> (atomicExpr <* spaces) <*> many (dotCall <* spaces)
+  -- TODO: It would be nice to mark each chained dot call individually
+  mark $ foldl applyDotCall <$> (atomicExpr <* spaces) <*> many (dotCall <* spaces)
 
 expr :: Parser Stx.Expr
 expr = dotCalls
