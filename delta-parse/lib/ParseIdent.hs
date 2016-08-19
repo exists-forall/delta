@@ -56,5 +56,8 @@ varIdentBody =
 
 varIdent :: Parser Stx.VarIdent
 varIdent =
-  (try $ Stx.VarIdent <$> ident <*> (spaces *> varIdentBody)) <|>
-  ((flip Stx.VarIdent (Stx.BodySlot Stx.EmptyTail)) <$> ident)
+  choice
+    [ try $ Stx.VarIdent <$> ident <*> (spaces *> varIdentBody)
+    , (flip Stx.VarIdent (Stx.BodySlot Stx.EmptyTail)) <$> ident
+    , try $ char '.' *> spaces *> (Stx.DotVarIdent <$> ident <*> (spaces *> varIdentTail))
+    ]

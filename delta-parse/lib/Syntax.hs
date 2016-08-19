@@ -14,7 +14,7 @@ data Ident = Ident IdentStartChar [IdentChar] deriving (Eq, Ord, Show)
 -- As with identifiers, this perfectly encodes the invariants of valid variable names.
 data VarIdentTail = EmptyTail | TailWord Ident VarIdentTail | TailSlot VarIdentTail deriving (Eq, Ord, Show)
 data VarIdentBody = BodyWord Ident VarIdentBody | BodySlot VarIdentTail deriving (Eq, Ord, Show)
-data VarIdent = VarIdent Ident VarIdentBody deriving (Eq, Ord, Show)
+data VarIdent = VarIdent Ident VarIdentBody | DotVarIdent Ident VarIdentTail deriving (Eq, Ord, Show)
 
 -- All types begin with an uppercase letter
 data TypeIdent = TypeIdent Letter [IdentChar] deriving (Eq, Ord, Show)

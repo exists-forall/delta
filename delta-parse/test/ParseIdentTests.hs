@@ -114,3 +114,37 @@ test = describe "ParseIdent" $ do
 
     it "rejects variables beginning with a slot" $
       fullParse varIdent "() foo" `shouldSatisfy` isLeft
+
+    it "parses dot variables" $
+      fullParse varIdent ".foo" `shouldBe`
+        Right (DotVarIdent fooIdent EmptyTail)
+
+    it "parses dot variables with multiple words and whitespace" $
+      fullParse varIdent ". foo BAR" `shouldBe`
+        Right (DotVarIdent fooIdent $ TailWord upperBarIdent EmptyTail)
+
+    it "parses dot variables with slots" $
+      fullParse varIdent ".foo()" `shouldBe`
+        Right (DotVarIdent fooIdent $ TailSlot EmptyTail)
+
+    it "parses dot variables with multiple slots" $
+      fullParse varIdent ".foo () ()" `shouldBe`
+        Right (DotVarIdent fooIdent $ TailSlot $ TailSlot EmptyTail)
+
+    it "parses dot varaibles with words and slots interleaved" $
+      fullParse varIdent ".foo BAR () ( ) baz () biz" `shouldBe`
+        Right (
+          DotVarIdent fooIdent $
+          TailWord upperBarIdent $
+          TailSlot $
+          TailSlot $
+          TailWord bazIdent $
+          TailSlot $
+          TailWord bizIdent $
+          EmptyTail)
+
+    it "rejects empty dot variables" $
+      fullParse varIdent "." `shouldSatisfy` isLeft
+
+    it "rejects dot variables beginning with a slot" $
+      fullParse varIdent ".() foo" `shouldSatisfy` isLeft
