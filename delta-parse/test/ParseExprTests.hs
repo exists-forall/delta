@@ -45,6 +45,18 @@ test = describe "ParseExpr" $ do
     it "parses qualified identifiers" $
       parseExpr "M::N :: y" `shouldBe` Right y
 
+    it "parses simple escaped identifiers" $
+      parseExpr "M :: N :: ` y `" `shouldBe` Right y
+
+    it "parses escaped identifiers with a single slot" $
+      parseExpr "` x () `" `shouldBe` Right x
+
+    it "parses escaped identifiers with multiple words and slots" $
+      parseExpr "` i ( ) j ( ) `" `shouldBe` Right i
+
+    it "parses escaped dot-function-style identifiers" $
+      parseExpr "` . e ( ) f ( ) `" `shouldBe` Right e
+
     it "parses unsigned integer literals" $
       parseExpr "42" `shouldBe` Right (LitUInt 42)
 

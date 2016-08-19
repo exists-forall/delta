@@ -7,6 +7,7 @@ import ParseUtils
 
 import qualified Syntax as Stx
 import ParseIdent (ident, path)
+import qualified ParseIdent (varIdent)
 
 import Data.Bifunctor (bimap, first)
 
@@ -44,9 +45,15 @@ callNonDot =
   assemble varPath (varIdent, args) =
     Stx.Call (Stx.Var (Stx.Path varPath varIdent)) (foldr1 Stx.Tuple args)
 
+escapableIdent :: Parser Stx.VarIdent
+escapableIdent =
+  choice
+    [ flip Stx.VarIdent (Stx.BodySlot Stx.EmptyTail) <$> ident
+    , char '`' *> spaces *> ParseIdent.varIdent <* spaces <* char '`'
+    ]
+
 var :: Parser Stx.Expr
-var = mark $
-  Stx.Var <$> (Stx.Path <$> path <*> (flip Stx.VarIdent (Stx.BodySlot Stx.EmptyTail) <$> ident))
+var = mark $ Stx.Var <$> (Stx.Path <$> path <*> escapableIdent)
 
 litUInt :: Parser Stx.Expr
 litUInt = mark $ (Stx.LitUInt . read) <$> many1 digit
