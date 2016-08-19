@@ -31,9 +31,6 @@ u' = StartChar . u
 i :: IdentStartChar -> [IdentChar] -> Ident
 i = Ident
 
-fullParse :: Parser a -> Text -> Either ParseError a
-fullParse p = parse (p <* eof) ""
-
 test :: Spec
 test = describe "ParseIdent" $ do
   let fooIdent = i (l F) [l' O, l' O]

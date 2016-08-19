@@ -20,3 +20,7 @@ rangeParser l a b =
   flip label l $
   fmap (toEnum . (subtract (fromEnum a)) . fromEnum) $
   satisfy (both (>= a) (<= b))
+
+-- Mostly for testing
+fullParse :: Parser a -> Text -> Either ParseError a
+fullParse p = parse (p <* eof) ""
