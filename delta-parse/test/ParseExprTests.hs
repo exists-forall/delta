@@ -135,3 +135,6 @@ test = describe "ParseExpr" $ do
     it "parses chained dot function calls with slots and nested calls" $
       parseExpr "x . c ( M::N::y.M::N::B ) . e (M::N::y) f()" `shouldBe`
         Right (Call e (Tuple (Call c (Tuple x (Call b y))) (Tuple y Unit)))
+
+    it "parses calls of parenthesized expressions" $
+      parseExpr "( f ) ( x )" `shouldBe` Right (Call f x)

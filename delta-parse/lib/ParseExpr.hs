@@ -100,28 +100,56 @@ atomicExpr = choice
   , litString
   ]
 
-dotCall :: Parser (Stx.Path Stx.VarIdent, [Stx.Expr])
+data Suffix
+  = SuffixDotCall (Stx.Path Stx.VarIdent) [Stx.Expr]
+  | SuffixCall Stx.Expr
+
+dotCall :: Parser Suffix
 dotCall =
   char '.' *> spaces *>
-  (first <$> ((.) <$> (Stx.Path <$> path) <*> (Stx.DotVarIdent <$> ident)) <*> (spaces *> callTail))
+  (uncurry SuffixDotCall <$>
+    (first
+      <$> ((.) <$> (Stx.Path <$> path) <*> (Stx.DotVarIdent <$> ident))
+      <*> (spaces *> callTail)))
 
-applyDotCall :: Stx.Expr -> (Stx.Path Stx.VarIdent, [Stx.Expr]) -> Stx.Expr
-applyDotCall receiver (varIdent, args) =
+suffixCall :: Parser Suffix
+suffixCall = SuffixCall <$> slot
+
+suffix :: Parser Suffix
+suffix =
+  choice
+    [ dotCall
+    , suffixCall
+    ]
+
+markedSuffix :: Parser (Suffix, SourcePos)
+markedSuffix = (,) <$> suffix <*> getPosition
+
+applySuffix :: Stx.Expr -> Suffix -> Stx.Expr
+applySuffix receiver (SuffixDotCall varIdent args) =
   Stx.Call (Stx.Var varIdent) (foldr1 Stx.Tuple (receiver : args))
+applySuffix receiver (SuffixCall arg) =
+  Stx.Call receiver arg
 
-dotCalls :: Parser Stx.Expr
-dotCalls =
+applyAndMarkSuffix :: SourcePos -> Stx.Expr -> (Suffix, SourcePos) -> Stx.Expr
+applyAndMarkSuffix pos1 receiver (suff, pos2) =
+  Stx.Mark pos1 (applySuffix receiver suff) pos2
+
+suffixes :: Parser Stx.Expr
+suffixes =
   {-
-  Spaces must belong to the *end* of elements here, not the beginning, because if spaces are
-  consumed at the beginning of an element then that element will be considered to have consumed
-  input and will become non-negotiable.
+  Spaces must belong to the *end* of suffixes here, not the beginning, because if spaces are
+  consumed at the beginning of a suffix then that suffix will be considered to have consumed input
+  and will become non-negotiable.
 
-  In other words, if spaces were considered to belong the beginning of dot calls, then if there
-  were trailing spaces after the last dot call, Parsec would treat those spaces as the beginning of
-  another (spurious and nonexistent) dot call, try to parse it, and fail.
+  In other words, if spaces were considered to belong the beginning of suffixes, then if there were
+  trailing spaces after the last suffix, Parsec would treat those spaces as the beginning of another
+  (spurious and nonexistent) suffix, try to parse it, and fail.
   -}
-  -- TODO: It would be nice to mark each chained dot call individually
-  mark $ foldl applyDotCall <$> (atomicExpr <* spaces) <*> many (dotCall <* spaces)
+  foldl
+    <$> (applyAndMarkSuffix <$> getPosition)
+    <*> (atomicExpr <* spaces)
+    <*> many (markedSuffix <* spaces)
 
 expr :: Parser Stx.Expr
-expr = dotCalls
+expr = suffixes
