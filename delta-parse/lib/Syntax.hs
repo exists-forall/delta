@@ -2,6 +2,8 @@ module Syntax where
 
 import Text.Parsec (SourcePos)
 
+import Numeric.Natural (Natural)
+
 {-
 This might seem like madness, but there is an exact one-to-one correspondence between valid Delta
 identifiers and the inhabitants of this type.  This representation perfectly encodes the invariants.
@@ -31,8 +33,12 @@ data Path a = Path [ModuleIdent] a deriving (Eq, Ord, Show)
 type VarPath = Path VarIdent
 type TypePath = Path TypeIdent
 
+data StringComponent = Char Char | Interpolate Expr deriving (Eq, Ord, Show)
+
 data Expr
   = Var (Path VarIdent)
+  | LitUInt Natural
+  | LitString [StringComponent]
   | Unit
   | Tuple Expr Expr
   | Call Expr Expr
@@ -42,6 +48,10 @@ data Expr
 -- For testing purposes:
 stripMarks :: Expr -> Expr
 stripMarks (Var v) = Var v
+stripMarks (LitUInt i) = LitUInt i
+stripMarks (LitString s) = LitString (map stripComponentMarks s) where
+  stripComponentMarks (Char c) = Char c
+  stripComponentMarks (Interpolate e) = Interpolate (stripMarks e)
 stripMarks Unit = Unit
 stripMarks (Tuple a b) = Tuple (stripMarks a) (stripMarks b)
 stripMarks (Call a b) = Call (stripMarks a) (stripMarks b)

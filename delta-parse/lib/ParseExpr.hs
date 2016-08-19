@@ -41,11 +41,49 @@ var :: Parser Stx.Expr
 var = mark $
   Stx.Var <$> (Stx.Path <$> path <*> (flip Stx.VarIdent (Stx.BodySlot Stx.EmptyTail) <$> ident))
 
+litUInt :: Parser Stx.Expr
+litUInt = mark $ (Stx.LitUInt . read) <$> many1 digit
+
+hexDigitValue :: Parser Int
+hexDigitValue =
+  choice
+    [ rangeParser "digit 0-9" '0' '9'
+    , (10 +) <$> rangeParser "letter a-f" 'a' 'f'
+    , (10 +) <$> rangeParser "letter A-F" 'A' 'F'
+    ]
+
+hexNumber :: Parser Int
+hexNumber = foldl ((+) . (16 *)) 0 <$> many1 hexDigitValue
+
+escapeSequence :: Parser Stx.StringComponent
+escapeSequence = choice
+  [ char '\\' *> pure (Stx.Char '\\')
+  , char '"' *> pure (Stx.Char '"')
+  , char 'n' *> pure (Stx.Char '\n')
+  , char 't' *> pure (Stx.Char '\t')
+  , char 'r' *> pure (Stx.Char '\r')
+  , char 'u' *> char '{' *> ((Stx.Char . toEnum) <$> hexNumber) <* char '}'
+  , Stx.Interpolate <$> parenthesized
+  ]
+
+stringComponent :: Parser Stx.StringComponent
+stringComponent =
+  choice
+    [ char '\\' *> escapeSequence
+    , Stx.Char <$> satisfy (/= '"')
+    ]
+
+litString :: Parser Stx.Expr
+litString = mark $
+  Stx.LitString <$> (char '"' *> many stringComponent <* char '"')
+
 atomicExpr :: Parser Stx.Expr
 atomicExpr = choice
   [ parenthesized
   , try callNonDot
   , var
+  , litUInt
+  , litString
   ]
 
 dotCall :: Parser (Stx.Path Stx.VarIdent, [Stx.Expr])

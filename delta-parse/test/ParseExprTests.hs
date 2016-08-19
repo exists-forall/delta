@@ -45,6 +45,33 @@ test = describe "ParseExpr" $ do
     it "parses qualified identifiers" $
       parseExpr "M::N :: y" `shouldBe` Right y
 
+    it "parses unsigned integer literals" $
+      parseExpr "42" `shouldBe` Right (LitUInt 42)
+
+    it "parses unsigned integer literals starting with zero" $
+      parseExpr "042" `shouldBe` Right (LitUInt 42)
+
+    it "parses simple strings" $
+      parseExpr "\"foo bar\"" `shouldBe` Right (LitString (map Char "foo bar"))
+
+    it "parses strings containing unicode characters" $
+      parseExpr "\"π ≈ 3.1415\"" `shouldBe` Right (LitString (map Char "π ≈ 3.1415"))
+
+    it "parses strings containing non-escaped newlines and tabs" $
+      parseExpr "\"foo\nbar\tbaz\"" `shouldBe` Right (LitString (map Char "foo\nbar\tbaz"))
+
+    it "parses strings containing simple escape sequences" $
+      parseExpr "\"foo\\nbar\\tbaz\\\"biz\\\\buz\\rquux\"" `shouldBe`
+        Right (LitString $ map Char "foo\nbar\tbaz\"biz\\buz\rquux")
+
+    it "parses strings containing arbitrary unicode escape sequences" $
+      parseExpr "\"\\u{3c0} \\u{2248} 3.1415\"" `shouldBe`
+        Right (LitString $ map Char "π ≈ 3.1415")
+
+    it "parses strings containing interpolated expressions" $
+      parseExpr "\"x=\\(x)!\"" `shouldBe`
+        Right (LitString [Char 'x', Char '=', Interpolate x, Char '!'])
+
     it "parses nullary function calls" $
       parseExpr "f()" `shouldBe` Right (Call f Unit)
 
