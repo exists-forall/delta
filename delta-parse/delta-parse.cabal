@@ -26,6 +26,7 @@ library
 
   other-modules:       ParseUtils
                      , ParseIdent
+                     , ParseExpr
 
   build-depends:       base >= 4.7 && < 5
                      , parsec
@@ -42,6 +43,9 @@ test-suite delta-parse-tests
 
                      , ParseIdent
                      , ParseIdentTests
+
+                     , ParseExpr
+                     , ParseExprTests
 
   build-depends:       base
                      , hspec
