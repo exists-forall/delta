@@ -12,9 +12,6 @@ import Syntax
 
 import Test.Hspec
 
-parseWholeTest :: (Show a) => Parser a -> Text -> IO ()
-parseWholeTest p = parseTest (p <* eof)
-
 -- Trivial aliases for easy construction
 l :: Letter -> IdentStartChar
 l = Alpha LowerCase
