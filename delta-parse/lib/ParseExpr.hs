@@ -6,7 +6,7 @@ where
 import ParseUtils
 
 import qualified Syntax as Stx
-import ParseIdent
+import ParseIdent (ident, path)
 
 import Data.Bifunctor (bimap, first)
 

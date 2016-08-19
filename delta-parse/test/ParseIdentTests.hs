@@ -4,8 +4,6 @@ module ParseIdentTests (test) where
 
 import Data.Either (isLeft)
 
-import Data.Text.Lazy (Text)
-
 import ParseUtils
 import ParseIdent
 import Syntax
