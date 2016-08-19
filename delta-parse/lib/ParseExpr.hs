@@ -16,11 +16,18 @@ mark p = Stx.Mark <$> getPosition <*> p <*> getPosition
 parenthesized :: Parser Stx.Expr
 parenthesized = mark $ char '(' *> spaces *> option Stx.Unit expr <* spaces <* char ')'
 
+slot :: Parser Stx.Expr
+slot =
+  choice
+    [ parenthesized
+    , litString
+    ]
+
 callTail :: Parser (Stx.VarIdentTail, [Stx.Expr])
 callTail =
   choice
     [ first <$> (Stx.TailWord <$> ident) <*> (spaces *> callTail)
-    , bimap Stx.TailSlot <$> ((:) <$> parenthesized) <*> (spaces *> callTail)
+    , bimap Stx.TailSlot <$> ((:) <$> slot) <*> (spaces *> callTail)
     , pure (Stx.EmptyTail, [])
     ]
 
@@ -28,7 +35,7 @@ callBody :: Parser (Stx.VarIdentBody, [Stx.Expr])
 callBody =
   choice
     [ first <$> (Stx.BodyWord <$> ident) <*> (spaces *> callBody)
-    , bimap Stx.BodySlot <$> ((:) <$> parenthesized) <*> (spaces *> callTail)
+    , bimap Stx.BodySlot <$> ((:) <$> slot) <*> (spaces *> callTail)
     ]
 
 callNonDot :: Parser Stx.Expr

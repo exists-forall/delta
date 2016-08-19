@@ -78,6 +78,9 @@ test = describe "ParseExpr" $ do
     it "parses unary function calls" $
       parseExpr "f(x)" `shouldBe` Right (Call f x)
 
+    it "parses function calls with naked string arguments" $
+      parseExpr "f \"x\"" `shouldBe` Right (Call f (LitString [Char 'x']))
+
     it "parses qualified function calls" $
       parseExpr "M :: N::G()" `shouldBe` Right (Call g Unit)
 
