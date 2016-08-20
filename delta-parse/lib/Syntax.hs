@@ -15,10 +15,25 @@ data Digit = D0|D1|D2|D3|D4|D5|D6|D7|D8|D9 deriving (Eq, Ord, Show, Enum)
 data IdentChar = StartChar IdentStartChar | Digit Digit deriving (Eq, Ord, Show)
 data Ident = Ident IdentStartChar [IdentChar] deriving (Eq, Ord, Show)
 
+data OperatorIdent
+  -- Mathematical operators
+  = OpAdd | OpSub | OpMul | OpDiv
+  -- Comparison operators
+  | OpEqu | OpNotEqu | OpGTE | OpLTE | OpLT | OpGT
+  -- Logical operators
+  | OpAnd | OpOr
+  -- Functional operators
+  | OpAt | OpCompLeft | OpCompRight
+  deriving (Eq, Ord, Show)
+
 -- As with identifiers, this perfectly encodes the invariants of valid variable names.
 data VarIdentTail = EmptyTail | TailWord Ident VarIdentTail | TailSlot VarIdentTail deriving (Eq, Ord, Show)
 data VarIdentBody = BodyWord Ident VarIdentBody | BodySlot VarIdentTail deriving (Eq, Ord, Show)
-data VarIdent = VarIdent Ident VarIdentBody | DotVarIdent Ident VarIdentTail deriving (Eq, Ord, Show)
+data VarIdent
+  = VarIdent Ident VarIdentBody
+  | DotVarIdent Ident VarIdentTail
+  | OperatorIdent OperatorIdent
+  deriving (Eq, Ord, Show)
 
 -- All types begin with an uppercase letter
 data TypeIdent = TypeIdent Letter [IdentChar] deriving (Eq, Ord, Show)

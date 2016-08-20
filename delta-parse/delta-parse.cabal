@@ -27,10 +27,13 @@ library
   other-modules:       ParseUtils
                      , ParseIdent
                      , ParseExpr
+                     , Precedence
+                     , DeltaPrecedence
 
   build-depends:       base >= 4.7 && < 5
                      , parsec
                      , text
+                     , containers
   default-language:    Haskell2010
 
 test-suite delta-parse-tests
@@ -47,9 +50,15 @@ test-suite delta-parse-tests
                      , ParseExpr
                      , ParseExprTests
 
+                     , Precedence
+
+                     , DeltaPrecedence
+                     , DeltaPrecedenceTests
+
   build-depends:       base
                      , hspec
                      , parsec
                      , text
+                     , containers
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
