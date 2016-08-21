@@ -5,9 +5,13 @@ where
 
 import ParseUtils
 
+import Data.Text (Text)
+
 import qualified Syntax as Stx
 import ParseIdent (ident, path)
 import qualified ParseIdent (varIdent)
+import Precedence
+import DeltaPrecedence
 
 import Data.Bifunctor (bimap, first)
 
@@ -151,5 +155,57 @@ suffixes =
     <*> (atomicExpr <* spaces)
     <*> many (markedSuffix <* spaces)
 
+funOp :: Parser Stx.OperatorIdent
+funOp =
+  choice
+    [ char '+' *> pure Stx.OpAdd
+    , char '-' *> pure Stx.OpSub
+    , char '*' *> pure Stx.OpMul
+    , char '/' *> pure Stx.OpDiv
+
+    , try (string "==") *> pure Stx.OpEqu
+    , try (string "=/=") *> pure Stx.OpNotEqu
+    , try (string ">=") *> pure Stx.OpGTE
+    , try (string "<=") *> pure Stx.OpLTE
+
+    , try (string "<<") *> pure Stx.OpCompLeft
+    , try (string ">>") *> pure Stx.OpCompRight
+
+    , char '<' *> pure Stx.OpLT
+    , char '>' *> pure Stx.OpGT
+
+    , string "&&" *> pure Stx.OpAnd
+    , try (string "||") *> pure Stx.OpOr -- `try` to prevent ambiguities with closure arguments
+
+    , char '@' *> pure Stx.OpAt
+    ]
+
+operator :: Parser BinaryOperator
+operator =
+  choice
+    [ FunOp <$> funOp
+    , char ',' *> pure TupleOp
+    ]
+
+operators :: Parser (UngroupedTerm Stx.Expr BinaryOperator)
+operators =
+  UngroupedTerm <$> suffixes <*> (spaces *> optionMaybe ((,) <$> operator <*> (spaces *> operators)))
+
+opToExpr :: BinaryOperator -> Stx.Expr -> Stx.Expr -> Stx.Expr
+opToExpr (FunOp op) a b = Stx.Call (Stx.Var (Stx.Path [] (Stx.OperatorIdent op))) (Stx.Tuple a b)
+opToExpr TupleOp a b = Stx.Tuple a b
+
+groupedOperators :: Parser Stx.Expr
+groupedOperators = do
+  mayGrouped <- (group deltaGrouping) <$> operators
+  case mayGrouped of
+    {- TODO:
+    This error message exposes implementation details of the compiler by showing the value
+    constructor names of operators.  We should print the operators themselves instead (e.g. "+"
+    instead of "FunOp OpAdd")
+    -}
+    Left (op1, op2) -> fail $ "Ambiguous mix of operators " ++ show op1 ++ " and " ++ show op2
+    Right grouped -> return $ substitute opToExpr grouped
+
 expr :: Parser Stx.Expr
-expr = suffixes
+expr = groupedOperators

@@ -10,6 +10,8 @@ import ParseExpr
 import Syntax
 import ParseUtils
 
+import Data.Either (isLeft)
+
 simpleIdent :: Letter -> Ident
 simpleIdent l = Ident (Alpha LowerCase l) []
 
@@ -37,6 +39,10 @@ test = describe "ParseExpr" $ do
   let c = Var (Path [] (DotVarIdent (simpleIdent C) $ TailSlot EmptyTail))
   let d = Var (Path [] (DotVarIdent (simpleIdent D) $ TailSlot $ TailSlot EmptyTail))
   let e = Var (Path [] (DotVarIdent (simpleIdent E) $ TailSlot $ TailWord (simpleIdent F) $ TailSlot EmptyTail))
+
+  let add = Var (Path [] (OperatorIdent OpAdd))
+  let mul = Var (Path [] (OperatorIdent OpMul))
+  let logicOr = Var (Path [] (OperatorIdent OpOr))
 
   describe "expr" $ do
     it "parses simple identifiers" $
@@ -138,3 +144,34 @@ test = describe "ParseExpr" $ do
 
     it "parses calls of parenthesized expressions" $
       parseExpr "( f ) ( x )" `shouldBe` Right (Call f x)
+
+    it "parses simple binary operator calls" $
+      parseExpr "x + M::N::y" `shouldBe` Right (Call add (Tuple x y))
+
+    it "parses mixed binary operator calls with right-grouping precedence" $
+      parseExpr "1 + 2 * 3" `shouldBe` Right
+        (Call add (Tuple (LitUInt 1) (Call mul (Tuple (LitUInt 2) (LitUInt 3)))))
+
+    it "parses mixed binary operator calls with left-grouping precedence" $
+      parseExpr "2 * 3 + 1" `shouldBe` Right
+        (Call add (Tuple (Call mul (Tuple (LitUInt 2) (LitUInt 3))) (LitUInt 1)))
+
+    it "parses left-associative binary operator calls" $
+      parseExpr "1 + 2 + 3" `shouldBe` Right
+        (Call add (Tuple (Call add (Tuple (LitUInt 1) (LitUInt 2))) (LitUInt 3)))
+
+    it "parses right-associative binary operator calls" $
+      parseExpr "1 || 2 || 3" `shouldBe` Right
+        (Call logicOr (Tuple (LitUInt 1) (Call logicOr (Tuple (LitUInt 2) (LitUInt 3)))))
+
+    it "rejects ambiguous binary operator calls" $
+      parseExpr "f >> g << h" `shouldSatisfy` isLeft
+
+    it "parses tuples" $
+      parseExpr "1, 2, 3" `shouldBe` Right (Tuple (LitUInt 1) (Tuple (LitUInt 2) (LitUInt 3)))
+
+    it "parses binary operator calls as function arguments" $
+      parseExpr "f ( x + M::N::y )" `shouldBe` Right (Call f (Call add (Tuple x y)))
+
+    it "parses tuples as function arguments" $
+      parseExpr "f ( x , M::N::y )" `shouldBe` Right (Call f (Tuple x y))
