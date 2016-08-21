@@ -3,11 +3,13 @@ module ParseUtils
   , Parser
   , both
   , rangeParser
+  , spaces
   , fullParse
   )
 where
 
-import Text.Parsec
+import Text.Parsec hiding (space, spaces)
+import qualified Text.Parsec.Char as ParsecChar (space)
 
 import Data.Text.Lazy (Text)
 
@@ -21,6 +23,12 @@ rangeParser l a b =
   flip label l $
   fmap (toEnum . (subtract (fromEnum a)) . fromEnum) $
   satisfy (both (>= a) (<= b))
+
+lineComment :: Parser ()
+lineComment = try (string "//") *> skipMany (noneOf "\r\n")
+
+spaces :: Parser ()
+spaces = skipMany ((ParsecChar.space *> pure ()) <|> lineComment)
 
 -- Mostly for testing
 fullParse :: Parser a -> Text -> Either ParseError a

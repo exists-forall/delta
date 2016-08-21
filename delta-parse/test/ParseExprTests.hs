@@ -33,6 +33,7 @@ test = describe "ParseExpr" $ do
   let g = Var (Path [m, n] (VarIdent (simpleUpperIdent G) $ BodySlot EmptyTail))
   let h = Var (Path [] (VarIdent (simpleIdent H) $ BodySlot $ TailSlot EmptyTail))
   let i = Var (Path [] (VarIdent (simpleIdent I) $ BodySlot $ TailWord (simpleIdent J) $ TailSlot EmptyTail))
+  let k = Var (Path [] (VarIdent (simpleIdent K) $ BodyWord (simpleIdent L) $ BodySlot EmptyTail))
 
   let a = Var (Path [] (DotVarIdent (simpleIdent A) EmptyTail))
   let b = Var (Path [m, n] (DotVarIdent (simpleUpperIdent B) EmptyTail))
@@ -114,6 +115,9 @@ test = describe "ParseExpr" $ do
     it "parses function calls with words and slots interleaved" $
       parseExpr "i ()j (  )" `shouldBe` Right (Call i (Tuple Unit Unit))
 
+    it "parses function calls with consecutive words" $
+      parseExpr "k l ( )" `shouldBe` Right (Call k Unit)
+
     it "parses function calls with words and filled slots interleaved" $
       parseExpr "i (  x) j(M::N :: y)" `shouldBe` Right (Call i (Tuple x y))
 
@@ -175,3 +179,15 @@ test = describe "ParseExpr" $ do
 
     it "parses tuples as function arguments" $
       parseExpr "f ( x , M::N::y )" `shouldBe` Right (Call f (Tuple x y))
+
+    it "parses comments as insignificant whitespace" $
+      parseExpr "f//comment\n(x)" `shouldBe` Right (Call f x)
+
+    it "parses comments as significant whitespace" $
+      parseExpr "k//comment\nl ( )" `shouldBe` Right (Call k Unit)
+
+    it "pares comments mixed with spaces" $
+      parseExpr "f // comment 1 \n \t \n // comment 2 \n \n ( x )" `shouldBe` Right (Call f x)
+
+    it "parses comments terminated by EOF" $
+      parseExpr "x//comment" `shouldBe` Right x
