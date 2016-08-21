@@ -8,8 +8,7 @@ import ParseUtils
 import Data.Text (Text)
 
 import qualified Syntax as Stx
-import ParseIdent (ident, path)
-import qualified ParseIdent (varIdent)
+import ParseIdent (ident, path, escapableIdent)
 import Precedence
 import DeltaPrecedence
 
@@ -48,13 +47,6 @@ callNonDot =
   mark $ assemble <$> path <*> (first <$> (Stx.VarIdent <$> ident) <*> (spaces *> callBody)) where
   assemble varPath (varIdent, args) =
     Stx.Call (Stx.Var (Stx.Path varPath varIdent)) (foldr1 Stx.Tuple args)
-
-escapableIdent :: Parser Stx.VarIdent
-escapableIdent =
-  choice
-    [ flip Stx.VarIdent (Stx.BodySlot Stx.EmptyTail) <$> ident
-    , char '`' *> spaces *> ParseIdent.varIdent <* spaces <* char '`'
-    ]
 
 var :: Parser Stx.Expr
 var = mark $ Stx.Var <$> (Stx.Path <$> path <*> escapableIdent)

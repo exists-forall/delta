@@ -50,6 +50,14 @@ type TypePath = Path TypeIdent
 
 data StringComponent = Char Char | Interpolate Expr deriving (Eq, Ord, Show)
 
+data Pat
+  = PatVar VarIdent
+  | PatTuple Pat Pat
+  | PatIgnore
+  | PatUnit
+  | MarkPat SourcePos Pat SourcePos
+  deriving (Eq, Ord, Show)
+
 data Expr
   = Var (Path VarIdent)
   | LitUInt Natural
@@ -61,6 +69,14 @@ data Expr
   deriving (Eq, Ord, Show)
 
 -- For testing purposes:
+
+stripPatMarks :: Pat -> Pat
+stripPatMarks (PatVar v) = PatVar v
+stripPatMarks (PatTuple a b) = PatTuple (stripPatMarks a) (stripPatMarks b)
+stripPatMarks PatIgnore = PatIgnore
+stripPatMarks PatUnit = PatUnit
+stripPatMarks (MarkPat _ pat _) = stripPatMarks pat
+
 stripMarks :: Expr -> Expr
 stripMarks (Var v) = Var v
 stripMarks (LitUInt i) = LitUInt i

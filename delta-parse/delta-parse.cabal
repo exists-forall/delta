@@ -27,6 +27,7 @@ library
   other-modules:       ParseUtils
                      , ParseIdent
                      , ParseExpr
+                     , ParsePat
                      , Precedence
                      , DeltaPrecedence
 
@@ -49,6 +50,9 @@ test-suite delta-parse-tests
 
                      , ParseExpr
                      , ParseExprTests
+
+                     , ParsePat
+                     , ParsePatTests
 
                      , Precedence
 

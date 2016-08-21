@@ -6,6 +6,7 @@ module ParseIdent
   , varIdent
   , typeIdent
   , path
+  , escapableIdent
   )
 where
 
@@ -72,3 +73,10 @@ typeIdent =
 
 path :: Parser [Stx.ModuleIdent]
 path = many (try $ moduleIdent <* spaces <* char ':' <* char ':' <* spaces)
+
+escapableIdent :: Parser Stx.VarIdent
+escapableIdent =
+  choice
+    [ flip Stx.VarIdent (Stx.BodySlot Stx.EmptyTail) <$> ident
+    , char '`' *> spaces *> ParseIdent.varIdent <* spaces <* char '`'
+    ]
