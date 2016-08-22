@@ -9,6 +9,7 @@ import Data.Text (Text)
 
 import qualified Syntax as Stx
 import ParseIdent (ident, path, escapableIdent)
+import ParsePat (pat)
 import Precedence
 import DeltaPrecedence
 
@@ -25,6 +26,7 @@ slot =
   choice
     [ parenthesized
     , litString
+    , func
     ]
 
 callTail :: Parser (Stx.VarIdentTail, [Stx.Expr])
@@ -87,6 +89,37 @@ litString :: Parser Stx.Expr
 litString = mark $
   Stx.LitString <$> (char '"' *> many stringComponent <* char '"')
 
+letStat :: Parser Stx.Stat
+letStat =
+  Stx.Let <$> try (pat <* spaces <* notFollowedBy operator <* char '=') <*> (spaces *> expr)
+
+assembleEvalOrRet :: Stx.Expr -> Maybe ([Stx.Stat], Stx.Expr) -> ([Stx.Stat], Stx.Expr)
+assembleEvalOrRet e (Just (stats, ret)) = (Stx.Let Stx.PatIgnore e : stats, ret)
+assembleEvalOrRet e Nothing = ([], e)
+
+markStat :: Parser Stx.Stat -> Parser Stx.Stat
+markStat p = Stx.MarkStat <$> getPosition <*> p <*> getPosition
+
+body :: Parser ([Stx.Stat], Stx.Expr)
+body =
+  choice
+    [ first <$> ((:) <$> (markStat $ letStat <* spaces <* char ';')) <*> (spaces *> body)
+    , assembleEvalOrRet <$> (expr <* spaces) <*> optionMaybe (char ';' *> spaces *> body)
+    , pure ([], Stx.Unit)
+    ]
+
+block :: Parser ([Stx.Stat], Stx.Expr)
+block = char '{' *> spaces *> body <* spaces <* char '}'
+
+funcArgs :: Parser Stx.Pat
+funcArgs =
+  option Stx.PatIgnore $
+  notFollowedBy operator *> char '|' *> spaces *> pat <* spaces <* char '|' <* spaces
+
+func :: Parser Stx.Expr
+func =
+  uncurry <$> (Stx.Func <$> funcArgs) <*> block
+
 atomicExpr :: Parser Stx.Expr
 atomicExpr = choice
   [ parenthesized
@@ -94,6 +127,7 @@ atomicExpr = choice
   , var
   , litUInt
   , litString
+  , func
   ]
 
 data Suffix

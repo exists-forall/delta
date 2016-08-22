@@ -44,6 +44,9 @@ test = describe "ParseExpr" $ do
   let add = Var (Path [] (OperatorIdent OpAdd))
   let mul = Var (Path [] (OperatorIdent OpMul))
   let logicOr = Var (Path [] (OperatorIdent OpOr))
+  let equ = Var (Path [] (OperatorIdent OpEqu))
+
+  let xPat = PatVar $ VarIdent (Ident (Alpha LowerCase X) []) $ BodySlot EmptyTail
 
   describe "expr" $ do
     it "parses simple identifiers" $
@@ -99,6 +102,12 @@ test = describe "ParseExpr" $ do
 
     it "parses function calls with naked string arguments" $
       parseExpr "f \"x\"" `shouldBe` Right (Call f (LitString [Char 'x']))
+
+    it "parses function calls with naked function arguments with no argument list" $
+      parseExpr "f { x }" `shouldBe` Right (Call f (Func PatIgnore [] x))
+
+    it "parses function calls with naked function arguments with argument lists" $
+      parseExpr "f | x | { x }" `shouldBe` Right (Call f (Func xPat [] x))
 
     it "parses qualified function calls" $
       parseExpr "M :: N::G()" `shouldBe` Right (Call g Unit)
@@ -179,6 +188,33 @@ test = describe "ParseExpr" $ do
 
     it "parses tuples as function arguments" $
       parseExpr "f ( x , M::N::y )" `shouldBe` Right (Call f (Tuple x y))
+
+    it "parses simple functions" $
+      parseExpr "{ x }" `shouldBe` Right (Func PatIgnore [] x)
+
+    it "parses function with arguments" $
+      parseExpr "| x | { x }" `shouldBe` Right (Func xPat [] x)
+
+    it "parses functions with assignments" $
+      parseExpr "{ x = M::N::y ; x }" `shouldBe` Right (Func PatIgnore [Let xPat y] x)
+
+    it "parses functions with evaluation statements" $
+      parseExpr "{ f ( ) ; x }" `shouldBe` Right (Func PatIgnore [Let PatIgnore (Call f Unit)] x)
+
+    it "parses functions which implicitly return unit" $
+      parseExpr "{ f ( ) ; }" `shouldBe` Right (Func PatIgnore [Let PatIgnore (Call f Unit)] Unit)
+
+    it "parses functions with multiple statements" $
+      parseExpr "{ f ( ) ; x = M::N::y ; x }" `shouldBe`
+        Right (Func PatIgnore [Let PatIgnore (Call f Unit), Let xPat y] x)
+
+    -- If assignment statements are not parsed carefully, this test will not pass.
+    it "parses functions with statements which are invocations of operators beginning with '='" $
+      parseExpr "{ x == M::N::y ; }" `shouldBe`
+        Right (Func PatIgnore [Let PatIgnore (Call equ (Tuple x y))] Unit)
+
+    it "parses empty functions" $
+      parseExpr "{}" `shouldBe` Right (Func PatIgnore [] Unit)
 
     it "parses comments as insignificant whitespace" $
       parseExpr "f//comment\n(x)" `shouldBe` Right (Call f x)
