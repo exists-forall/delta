@@ -8,7 +8,7 @@ import ParseUtils
 import Data.Text (Text)
 
 import qualified Syntax as Stx
-import ParseIdent (ident, path, escapableIdent)
+import ParseIdent (ident, path, escapableIdent, keyword)
 import ParsePat (pat)
 import Precedence
 import DeltaPrecedence
@@ -109,7 +109,11 @@ body =
     ]
 
 block :: Parser ([Stx.Stat], Stx.Expr)
-block = char '{' *> spaces *> body <* spaces <* char '}'
+block =
+  choice
+    [ char '{' *> spaces *> body <* spaces <* char '}'
+    , keyword "do" *> spaces *> body <* spaces
+    ]
 
 funcArgs :: Parser Stx.Pat
 funcArgs =

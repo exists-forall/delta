@@ -109,6 +109,12 @@ test = describe "ParseExpr" $ do
     it "parses function calls with naked function arguments with argument lists" $
       parseExpr "f | x | { x }" `shouldBe` Right (Call f (Func xPat [] x))
 
+    it "parses function calls with naked 'do'-notation function arguments with no argument list" $
+      parseExpr "f do x" `shouldBe` Right (Call f (Func PatIgnore [] x))
+
+    it "parses function calls with naked 'do'-notation function arguments with argument lists" $
+      parseExpr "f | x | do x" `shouldBe` Right (Call f (Func xPat [] x))
+
     it "parses qualified function calls" $
       parseExpr "M :: N::G()" `shouldBe` Right (Call g Unit)
 
@@ -207,6 +213,42 @@ test = describe "ParseExpr" $ do
     it "parses functions with multiple statements" $
       parseExpr "{ f ( ) ; x = M::N::y ; x }" `shouldBe`
         Right (Func PatIgnore [Let PatIgnore (Call f Unit), Let xPat y] x)
+
+    it "parses simple 'do'-notation functions" $
+      parseExpr "do x" `shouldBe` Right (Func PatIgnore [] x)
+
+    it "parses 'do'-notation functions with arguments" $
+      parseExpr "| x | do x" `shouldBe` Right (Func xPat [] x)
+
+    it "parses 'do'-notation functions with assignments" $
+      parseExpr "do x = M::N::y ; x" `shouldBe` Right (Func PatIgnore [Let xPat y] x)
+
+    it "parses 'do'-notation functions with evaluation statements" $
+      parseExpr "do f ( ) ; x" `shouldBe` Right (Func PatIgnore [Let PatIgnore (Call f Unit)] x)
+
+    it "parses 'do'-notation functions which implicitly return unit" $
+      parseExpr "do f ( ) ;" `shouldBe` Right (Func PatIgnore [Let PatIgnore (Call f Unit)] Unit)
+
+    it "parses functions with multiple statements" $
+      parseExpr "do f ( ) ; x = M::N::y ; x" `shouldBe`
+        Right (Func PatIgnore [Let PatIgnore (Call f Unit), Let xPat y] x)
+
+    it "parses 'do'-notation functions with no space between 'do' and the body" $
+      parseExpr "do()" `shouldBe` Right (Func PatIgnore [] Unit)
+
+    it "parses 'do'-notation functions not terminated by EOF" $
+      parseExpr "( do f ( ) ; x = M::N::y ; x )" `shouldBe`
+        Right (Func PatIgnore [Let PatIgnore (Call f Unit), Let xPat y] x)
+
+    it "parses nested 'do'-notation functions" $
+      parseExpr "f do x ; (M::N::G do h ( ) ( ) ; M::N::y)" `shouldBe`
+        Right
+          (Call
+            f
+            (Func
+              PatIgnore
+              [Let PatIgnore x]
+              (Call g (Func PatIgnore [Let PatIgnore (Call h (Tuple Unit Unit))] y))))
 
     -- If assignment statements are not parsed carefully, this test will not pass.
     it "parses functions with statements which are invocations of operators beginning with '='" $
