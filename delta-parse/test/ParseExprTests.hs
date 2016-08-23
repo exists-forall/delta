@@ -23,30 +23,102 @@ parseExpr = fmap stripMarks . fullParse expr
 
 test :: Spec
 test = describe "ParseExpr" $ do
-  let m = ModuleIdent M []
-  let n = ModuleIdent N []
+  let
+    m = ModuleIdent M []
+    n = ModuleIdent N []
 
-  let x = Var (Path [] (VarIdent (simpleIdent X) $ BodySlot EmptyTail))
-  let y = Var (Path [m, n] (VarIdent (simpleIdent Y) $ BodySlot EmptyTail))
+    -- Simple variables
 
-  let f = Var (Path [] (VarIdent (simpleIdent F) $ BodySlot EmptyTail))
-  let g = Var (Path [m, n] (VarIdent (simpleUpperIdent G) $ BodySlot EmptyTail))
-  let h = Var (Path [] (VarIdent (simpleIdent H) $ BodySlot $ TailSlot EmptyTail))
-  let i = Var (Path [] (VarIdent (simpleIdent I) $ BodySlot $ TailWord (simpleIdent J) $ TailSlot EmptyTail))
-  let k = Var (Path [] (VarIdent (simpleIdent K) $ BodyWord (simpleIdent L) $ BodySlot EmptyTail))
+    x = Var
+      $ Path []
+      $ VarIdent (simpleIdent X)
+      $ BodySlot
+      $ EmptyTail
 
-  let a = Var (Path [] (DotVarIdent (simpleIdent A) EmptyTail))
-  let b = Var (Path [m, n] (DotVarIdent (simpleUpperIdent B) EmptyTail))
-  let c = Var (Path [] (DotVarIdent (simpleIdent C) $ TailSlot EmptyTail))
-  let d = Var (Path [] (DotVarIdent (simpleIdent D) $ TailSlot $ TailSlot EmptyTail))
-  let e = Var (Path [] (DotVarIdent (simpleIdent E) $ TailSlot $ TailWord (simpleIdent F) $ TailSlot EmptyTail))
+    y = Var
+      $ Path [m, n]
+      $ VarIdent (simpleIdent Y)
+      $ BodySlot
+      $ EmptyTail
 
-  let add = Var (Path [] (OperatorIdent OpAdd))
-  let mul = Var (Path [] (OperatorIdent OpMul))
-  let logicOr = Var (Path [] (OperatorIdent OpOr))
-  let equ = Var (Path [] (OperatorIdent OpEqu))
+    -- Regular-notation functions
 
-  let xPat = PatVar $ VarIdent (Ident (Alpha LowerCase X) []) $ BodySlot EmptyTail
+    f = Var
+      $ Path []
+      $ VarIdent (simpleIdent F)
+      $ BodySlot
+      $ EmptyTail
+
+    g = Var
+      $ Path [m, n]
+      $ VarIdent (simpleUpperIdent G)
+      $ BodySlot
+      $ EmptyTail
+
+    h = Var
+      $ Path []
+      $ VarIdent (simpleIdent H)
+      $ BodySlot
+      $ TailSlot
+      $ EmptyTail
+
+    i = Var
+      $ Path []
+      $ VarIdent (simpleIdent I)
+      $ BodySlot
+      $ TailWord (simpleIdent J)
+      $ TailSlot
+      $ EmptyTail
+
+    k = Var
+      $ Path []
+      $ VarIdent (simpleIdent K)
+      $ BodyWord (simpleIdent L)
+      $ BodySlot
+      $ EmptyTail
+
+    -- Dot-notation functions
+
+    a = Var
+      $ Path []
+      $ DotVarIdent (simpleIdent A)
+      $ EmptyTail
+
+    b = Var
+      $ Path [m, n]
+      $ DotVarIdent (simpleUpperIdent B)
+      $ EmptyTail
+
+    c = Var
+      $ Path []
+      $ DotVarIdent (simpleIdent C)
+      $ TailSlot
+      $ EmptyTail
+
+    d = Var
+      $ Path []
+      $ DotVarIdent (simpleIdent D)
+      $ TailSlot
+      $ TailSlot
+      $ EmptyTail
+
+    e = Var
+      $ Path []
+      $ DotVarIdent (simpleIdent E)
+      $ TailSlot
+      $ TailWord (simpleIdent F)
+      $ TailSlot
+      $ EmptyTail
+
+    add = Var $ Path [] $ OperatorIdent OpAdd
+    mul = Var $ Path [] $ OperatorIdent OpMul
+    equ = Var $ Path [] $ OperatorIdent OpEqu
+    logicOr = Var $ Path [] $ OperatorIdent OpOr
+
+    xPat = PatVar
+         $ VarIdent (simpleIdent X)
+         $ BodySlot
+         $ EmptyTail
 
   describe "expr" $ do
     it "parses simple identifiers" $
@@ -241,7 +313,7 @@ test = describe "ParseExpr" $ do
         Right (Func PatIgnore [Let PatIgnore (Call f Unit), Let xPat y] x)
 
     it "parses nested 'do'-notation functions" $
-      parseExpr "f do x ; (M::N::G do h ( ) ( ) ; M::N::y)" `shouldBe`
+      parseExpr "f do x ; M::N::G do h ( ) ( ) ; M::N::y" `shouldBe`
         Right
           (Call
             f
@@ -264,7 +336,7 @@ test = describe "ParseExpr" $ do
     it "parses comments as significant whitespace" $
       parseExpr "k//comment\nl ( )" `shouldBe` Right (Call k Unit)
 
-    it "pares comments mixed with spaces" $
+    it "parses comments mixed with spaces" $
       parseExpr "f // comment 1 \n \t \n // comment 2 \n \n ( x )" `shouldBe` Right (Call f x)
 
     it "parses comments terminated by EOF" $
