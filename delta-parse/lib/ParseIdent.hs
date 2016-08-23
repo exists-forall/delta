@@ -1,18 +1,34 @@
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module ParseIdent
+  -- Common combinators with implicit reserved word handling
   ( ident
-  , moduleIdent
-  , varIdent
-  , typeIdent
   , path
   , escapableIdent
+  , keyword
+
+  -- Lower-level combinators with explicit reserved word handling
+  , CheckReserved (..)
+  , ident'
+  , moduleIdent'
+  , varIdent'
+  , typeIdent'
+  , path'
   )
 where
 
 import ParseUtils
 
 import qualified Syntax as Stx
+
+reservedWord :: Parser String
+reservedWord =
+  choice $ map (try . (<* notFollowedBy identChar) . string)
+    [ "do"
+    ]
+
+data CheckReserved = AllowReserved | ForbidReserved
 
 upperLetter :: Parser Stx.Letter
 upperLetter = rangeParser "uppercase letter" 'A' 'Z'
@@ -34,49 +50,65 @@ identStartChar =
 identChar :: Parser Stx.IdentChar
 identChar = (Stx.StartChar <$> identStartChar) <|> (Stx.Digit <$> syntaxDigit)
 
-ident :: Parser Stx.Ident
-ident =
+checkReserved :: CheckReserved -> Parser a -> Parser a
+checkReserved AllowReserved p = p
+checkReserved ForbidReserved p = notFollowedBy reservedWord *> p
+
+ident' :: CheckReserved -> Parser Stx.Ident
+ident' reserved =
   flip label "identifier" $
-  try $
+  try $ checkReserved reserved $
   Stx.Ident <$> identStartChar <*> many identChar
 
-moduleIdent :: Parser Stx.ModuleIdent
-moduleIdent =
+ident :: Parser Stx.Ident
+ident = ident' ForbidReserved
+
+moduleIdent' :: CheckReserved -> Parser Stx.ModuleIdent
+moduleIdent' reserved =
   flip label "module identifier" $
-  try $
+  try $ checkReserved reserved $
   Stx.ModuleIdent <$> upperLetter <*> many identChar
 
-varIdentTail :: Parser Stx.VarIdentTail
-varIdentTail =
-  (Stx.TailWord <$> ident <*> (spaces *> varIdentTail)) <|>
-  (Stx.TailSlot <$> (char '(' *> spaces *> char ')' *> spaces *> varIdentTail)) <|>
+varIdentTail' :: CheckReserved -> Parser Stx.VarIdentTail
+varIdentTail' reserved =
+  (Stx.TailWord <$> ident' reserved <*> (spaces *> varIdentTail' reserved)) <|>
+  (Stx.TailSlot <$> (char '(' *> spaces *> char ')' *> spaces *> varIdentTail' reserved)) <|>
   pure Stx.EmptyTail
 
-varIdentBody :: Parser Stx.VarIdentBody
-varIdentBody =
-  (Stx.BodyWord <$> ident <*> (spaces *> varIdentBody)) <|>
-  (Stx.BodySlot <$> (char '(' *> spaces *> char ')' *> spaces *> varIdentTail))
+varIdentBody' :: CheckReserved -> Parser Stx.VarIdentBody
+varIdentBody' reserved =
+  (Stx.BodyWord <$> ident' reserved <*> (spaces *> varIdentBody' reserved)) <|>
+  (Stx.BodySlot <$> (char '(' *> spaces *> char ')' *> spaces *> varIdentTail' reserved))
 
-varIdent :: Parser Stx.VarIdent
-varIdent =
+varIdent' :: CheckReserved -> Parser Stx.VarIdent
+varIdent' reserved =
   choice
-    [ try $ Stx.VarIdent <$> ident <*> (spaces *> varIdentBody)
-    , (flip Stx.VarIdent (Stx.BodySlot Stx.EmptyTail)) <$> ident
-    , try $ char '.' *> spaces *> (Stx.DotVarIdent <$> ident <*> (spaces *> varIdentTail))
+    [ try $ Stx.VarIdent <$> ident' reserved <*> (spaces *> varIdentBody' reserved)
+    , (flip Stx.VarIdent (Stx.BodySlot Stx.EmptyTail)) <$> ident' reserved
+    , try $ char '.' *> spaces *>
+      (Stx.DotVarIdent <$> ident' reserved <*> (spaces *> varIdentTail' reserved))
     ]
 
-typeIdent :: Parser Stx.TypeIdent
-typeIdent =
+typeIdent' :: CheckReserved -> Parser Stx.TypeIdent
+typeIdent' reserved =
   flip label "type identifier" $
-  try $
+  try $ checkReserved reserved $
   Stx.TypeIdent <$> upperLetter <*> many identChar
 
+path' :: CheckReserved -> Parser [Stx.ModuleIdent]
+path' reserved = many (try $ moduleIdent' reserved <* spaces <* char ':' <* char ':' <* spaces)
+
 path :: Parser [Stx.ModuleIdent]
-path = many (try $ moduleIdent <* spaces <* char ':' <* char ':' <* spaces)
+path = path' ForbidReserved
 
 escapableIdent :: Parser Stx.VarIdent
 escapableIdent =
   choice
-    [ flip Stx.VarIdent (Stx.BodySlot Stx.EmptyTail) <$> ident
-    , char '`' *> spaces *> ParseIdent.varIdent <* spaces <* char '`'
+    [ flip Stx.VarIdent (Stx.BodySlot Stx.EmptyTail) <$> ident' ForbidReserved
+    , try $ char '`' *> spaces *> ParseIdent.varIdent' AllowReserved <* spaces <* char '`'
     ]
+
+keyword :: String -> Parser String
+keyword word =
+  try (string word <* notFollowedBy identChar)
+  <?> ("Keyword \"" ++ word ++ "\"")

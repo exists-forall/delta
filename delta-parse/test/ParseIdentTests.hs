@@ -33,6 +33,13 @@ test = describe "ParseIdent" $ do
   let bazIdent = i (l B) [l' A, l' Z]
   let bizIdent = i (l B) [l' I, l' Z]
 
+  {-
+  For extra conservatism in catching bugs, tests which expect successful parsing ("parses...")
+  restrict the space of accepted strings using `ForbidReserved`, and tests which expect parse
+  failure ("rejects...") widen the space of accepted strings using `AllowReserved`, except where
+  the test specifically involves special behavior regarding reserved words.
+  -}
+
   describe "ident" $ do
     it "parses lowercase identifiers" $
       fullParse ident "foo" `shouldBe` Right fooIdent
@@ -55,39 +62,42 @@ test = describe "ParseIdent" $ do
     it "rejects identifiers containing non-ascii characters" $
       fullParse ident "pi_π" `shouldSatisfy` isLeft
 
-  describe "moduleIdent" $ do
+    it "rejects identifiers which are reserved words" $
+      fullParse ident "do" `shouldSatisfy` isLeft
+
+  describe "moduleIdent'" $ do
     it "parses module identifiers" $
-      fullParse moduleIdent "Foo_42" `shouldBe`
+      fullParse (moduleIdent' ForbidReserved) "Foo_42" `shouldBe`
         Right (ModuleIdent F [l' O, l' O, StartChar Underscore, Digit D4, Digit D2])
 
     it "rejects module identifiers starting with a lowercase letter" $
-      fullParse moduleIdent "foo_42" `shouldSatisfy` isLeft
+      fullParse (moduleIdent' AllowReserved) "foo_42" `shouldSatisfy` isLeft
 
     it "rejects module identifiers starting with an underscore" $
-      fullParse moduleIdent "_foo_42" `shouldSatisfy` isLeft
+      fullParse (moduleIdent' AllowReserved) "_foo_42" `shouldSatisfy` isLeft
 
     it "rejects module identifiers starting with a digit" $
-      fullParse moduleIdent "42Foo" `shouldSatisfy` isLeft
+      fullParse (moduleIdent' AllowReserved) "42Foo" `shouldSatisfy` isLeft
 
-  describe "varIdent" $ do
+  describe "varIdent'" $ do
     it "parses single-identifier variables" $
-      fullParse varIdent "foo" `shouldBe`
+      fullParse (varIdent' ForbidReserved) "foo" `shouldBe`
         Right (VarIdent fooIdent $ BodySlot $ EmptyTail)
 
     it "parses single-identifier variables with an explicit slot" $
-      fullParse varIdent "foo()" `shouldBe`
+      fullParse (varIdent' ForbidReserved) "foo()" `shouldBe`
         Right (VarIdent fooIdent $ BodySlot EmptyTail)
 
     it "parses variables with multiple words" $
-      fullParse varIdent "foo BAR baz ()" `shouldBe`
+      fullParse (varIdent' ForbidReserved) "foo BAR baz ()" `shouldBe`
         Right (VarIdent fooIdent $ BodyWord upperBarIdent $ BodyWord bazIdent $ BodySlot EmptyTail)
 
     it "parses variables with multiple slots" $
-      fullParse varIdent "foo () ()" `shouldBe`
+      fullParse (varIdent' ForbidReserved) "foo () ()" `shouldBe`
         Right (VarIdent fooIdent $ BodySlot $ TailSlot EmptyTail)
 
     it "parses variables with words and slots interleaved" $
-      fullParse varIdent "foo BAR () (  ) baz () biz" `shouldBe`
+      fullParse (varIdent' ForbidReserved) "foo BAR () (  ) baz () biz" `shouldBe`
         Right (
           VarIdent fooIdent $
           BodyWord upperBarIdent $
@@ -99,32 +109,32 @@ test = describe "ParseIdent" $ do
           EmptyTail)
 
     it "rejects empty variables" $
-      fullParse varIdent "" `shouldSatisfy` isLeft
+      fullParse (varIdent' AllowReserved) "" `shouldSatisfy` isLeft
 
     it "rejects variables without a single slot" $
-      fullParse varIdent "foo bar" `shouldSatisfy` isLeft
+      fullParse (varIdent' AllowReserved) "foo bar" `shouldSatisfy` isLeft
 
     it "rejects variables beginning with a slot" $
-      fullParse varIdent "() foo" `shouldSatisfy` isLeft
+      fullParse (varIdent' AllowReserved) "() foo" `shouldSatisfy` isLeft
 
     it "parses dot variables" $
-      fullParse varIdent ".foo" `shouldBe`
+      fullParse (varIdent' ForbidReserved) ".foo" `shouldBe`
         Right (DotVarIdent fooIdent EmptyTail)
 
     it "parses dot variables with multiple words and whitespace" $
-      fullParse varIdent ". foo BAR" `shouldBe`
+      fullParse (varIdent' ForbidReserved) ". foo BAR" `shouldBe`
         Right (DotVarIdent fooIdent $ TailWord upperBarIdent EmptyTail)
 
     it "parses dot variables with slots" $
-      fullParse varIdent ".foo()" `shouldBe`
+      fullParse (varIdent' ForbidReserved) ".foo()" `shouldBe`
         Right (DotVarIdent fooIdent $ TailSlot EmptyTail)
 
     it "parses dot variables with multiple slots" $
-      fullParse varIdent ".foo () ()" `shouldBe`
+      fullParse (varIdent' ForbidReserved) ".foo () ()" `shouldBe`
         Right (DotVarIdent fooIdent $ TailSlot $ TailSlot EmptyTail)
 
     it "parses dot varaibles with words and slots interleaved" $
-      fullParse varIdent ".foo BAR () ( ) baz () biz" `shouldBe`
+      fullParse (varIdent' ForbidReserved) ".foo BAR () ( ) baz () biz" `shouldBe`
         Right (
           DotVarIdent fooIdent $
           TailWord upperBarIdent $
@@ -136,21 +146,21 @@ test = describe "ParseIdent" $ do
           EmptyTail)
 
     it "rejects empty dot variables" $
-      fullParse varIdent "." `shouldSatisfy` isLeft
+      fullParse (varIdent' AllowReserved) "." `shouldSatisfy` isLeft
 
     it "rejects dot variables beginning with a slot" $
-      fullParse varIdent ".() foo" `shouldSatisfy` isLeft
+      fullParse (varIdent' AllowReserved) ".() foo" `shouldSatisfy` isLeft
 
-  describe "typeIdent" $ do
+  describe "typeIdent'" $ do
     it "parses type identifiers" $
-      fullParse typeIdent "Foo_42" `shouldBe`
+      fullParse (typeIdent' ForbidReserved) "Foo_42" `shouldBe`
         Right (TypeIdent F [l' O, l' O, StartChar Underscore, Digit D4, Digit D2])
 
     it "rejects type identifiers starting with a lowercase letter" $
-      fullParse typeIdent "foo_42" `shouldSatisfy` isLeft
+      fullParse (typeIdent' AllowReserved) "foo_42" `shouldSatisfy` isLeft
 
     it "rejects type identifiers starting with an underscore" $
-      fullParse typeIdent "_foo_42" `shouldSatisfy` isLeft
+      fullParse (typeIdent' AllowReserved) "_foo_42" `shouldSatisfy` isLeft
 
     it "rejects type identifiers starting with a digit" $
-      fullParse typeIdent "42Foo" `shouldSatisfy` isLeft
+      fullParse (typeIdent' AllowReserved) "42Foo" `shouldSatisfy` isLeft
