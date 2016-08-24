@@ -27,12 +27,10 @@ module PosetSubsetSession
 where
 
 import qualified Data.Map as Map
-import Data.Map (Map)
+import Data.Map (Map, (!))
 
 import qualified IndexSet
 import IndexSet (IndexSet)
-
-import HelpfulUnsafeLookup
 
 import qualified TopoSort
 import qualified Families

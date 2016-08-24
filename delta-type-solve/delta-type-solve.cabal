@@ -37,7 +37,6 @@ library
                      , TypeInfer
 
                      -- Utility modules
-                     , HelpfulUnsafeLookup
                      , CollectionUtils
                      , OrderedPair
                      , ComplementSet
@@ -88,7 +87,6 @@ test-suite delta-type-solve-tests
                      , HandleExternalProblemTests
 
                      -- non-tested modules
-                     , HelpfulUnsafeLookup
                      , CollectionUtils
                      , OrderedPair
                      , ComplementSet
