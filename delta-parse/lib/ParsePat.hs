@@ -7,12 +7,17 @@ import ParseUtils
 
 import qualified Syntax as Stx
 import ParseIdent (escapableIdent)
+import ParseType (possibleFunc)
 
 markPat :: Parser Stx.Pat -> Parser Stx.Pat
 markPat p = Stx.MarkPat <$> getPosition <*> p <*> getPosition
 
 patVar :: Parser Stx.Pat
-patVar = markPat $ Stx.PatVar <$> escapableIdent
+patVar =
+  markPat $
+  Stx.PatVar
+    <$> (escapableIdent <* spaces)
+    <*> optionMaybe (char ':' *> spaces *> possibleFunc)
 
 patIgnore :: Parser Stx.Pat
 patIgnore = markPat $ char '_' *> pure Stx.PatIgnore

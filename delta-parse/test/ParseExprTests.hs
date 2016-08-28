@@ -115,7 +115,7 @@ test = describe "ParseExpr" $ do
     equ = Var $ Path [] $ OperatorIdent OpEqu
     logicOr = Var $ Path [] $ OperatorIdent OpOr
 
-    xPat = PatVar
+    xPat = flip PatVar Nothing
          $ VarIdent (simpleIdent X)
          $ BodySlot
          $ EmptyTail

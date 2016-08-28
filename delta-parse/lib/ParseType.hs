@@ -1,5 +1,6 @@
 module ParseType
   ( type_
+  , possibleFunc
   )
 where
 

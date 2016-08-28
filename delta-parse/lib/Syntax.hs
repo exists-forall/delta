@@ -48,7 +48,7 @@ data Path a = Path [ModuleIdent] a deriving (Eq, Ord, Show)
 data StringComponent = Char Char | Interpolate Expr deriving (Eq, Ord, Show)
 
 data Pat
-  = PatVar VarIdent
+  = PatVar VarIdent (Maybe Type)
   | PatTuple Pat Pat
   | PatIgnore
   | PatUnit
@@ -82,7 +82,7 @@ data Type
 -- For testing purposes:
 
 stripPatMarks :: Pat -> Pat
-stripPatMarks (PatVar v) = PatVar v
+stripPatMarks (PatVar v t) = PatVar v t
 stripPatMarks (PatTuple a b) = PatTuple (stripPatMarks a) (stripPatMarks b)
 stripPatMarks PatIgnore = PatIgnore
 stripPatMarks PatUnit = PatUnit
