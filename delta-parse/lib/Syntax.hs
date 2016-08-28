@@ -58,13 +58,6 @@ data Pat
   | MarkPat SourcePos Pat SourcePos
   deriving (Eq, Ord, Show)
 
--- "evaluation statements" are just Let statements with an implicit PatIgnore left-hand-side.
--- e.g. the statement `print("hello");` is equivalent to `_ = print("hello");` in the AST.
-data Stat
-  = Let Pat Expr
-  | MarkStat SourcePos Stat SourcePos
-  deriving (Eq, Ord, Show)
-
 data Expr
   = Var (Path VarIdent)
   | LitUInt Natural
@@ -72,7 +65,8 @@ data Expr
   | Unit
   | Tuple Expr Expr
   | Call Expr Expr
-  | Func Pat [Stat] Expr
+  | Func Pat Expr
+  | Let Pat Expr Expr
   | Mark SourcePos Expr SourcePos
   deriving (Eq, Ord, Show)
 
@@ -85,10 +79,6 @@ stripPatMarks PatIgnore = PatIgnore
 stripPatMarks PatUnit = PatUnit
 stripPatMarks (MarkPat _ pat _) = stripPatMarks pat
 
-stripStatMarks :: Stat -> Stat
-stripStatMarks (MarkStat _ stat _) = stripStatMarks stat
-stripStatMarks (Let pat expr) = Let (stripPatMarks pat) (stripMarks expr)
-
 stripMarks :: Expr -> Expr
 stripMarks (Var v) = Var v
 stripMarks (LitUInt i) = LitUInt i
@@ -98,6 +88,6 @@ stripMarks (LitString s) = LitString (map stripComponentMarks s) where
 stripMarks Unit = Unit
 stripMarks (Tuple a b) = Tuple (stripMarks a) (stripMarks b)
 stripMarks (Call a b) = Call (stripMarks a) (stripMarks b)
-stripMarks (Func pat stats ret) =
-  Func (stripPatMarks pat) (map stripStatMarks stats) (stripMarks ret)
+stripMarks (Func pat ret) = Func (stripPatMarks pat) (stripMarks ret)
+stripMarks (Let pat e ret) = Let (stripPatMarks pat) (stripMarks e) (stripMarks ret)
 stripMarks (Mark _ e _) = stripMarks e

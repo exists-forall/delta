@@ -89,26 +89,23 @@ litString :: Parser Stx.Expr
 litString = mark $
   Stx.LitString <$> (char '"' *> many stringComponent <* char '"')
 
-letStat :: Parser Stx.Stat
-letStat =
-  Stx.Let <$> try (pat <* spaces <* notFollowedBy operator <* char '=') <*> (spaces *> expr)
+letBinding :: Parser (Stx.Pat, Stx.Expr)
+letBinding =
+  (,) <$> try (pat <* spaces <* notFollowedBy operator <* char '=') <*> (spaces *> expr)
 
-assembleEvalOrRet :: Stx.Expr -> Maybe ([Stx.Stat], Stx.Expr) -> ([Stx.Stat], Stx.Expr)
-assembleEvalOrRet e (Just (stats, ret)) = (Stx.Let Stx.PatIgnore e : stats, ret)
-assembleEvalOrRet e Nothing = ([], e)
+assembleEvalOrRet :: Stx.Expr -> Maybe Stx.Expr -> Stx.Expr
+assembleEvalOrRet e (Just ret) = Stx.Let Stx.PatIgnore e ret
+assembleEvalOrRet e Nothing = e
 
-markStat :: Parser Stx.Stat -> Parser Stx.Stat
-markStat p = Stx.MarkStat <$> getPosition <*> p <*> getPosition
-
-body :: Parser ([Stx.Stat], Stx.Expr)
+body :: Parser Stx.Expr
 body =
   choice
-    [ first <$> ((:) <$> (markStat $ letStat <* spaces <* char ';')) <*> (spaces *> body)
+    [ uncurry Stx.Let <$> (letBinding <* spaces <* char ';') <*> (spaces *> body)
     , assembleEvalOrRet <$> (expr <* spaces) <*> optionMaybe (char ';' *> spaces *> body)
-    , pure ([], Stx.Unit)
+    , pure Stx.Unit
     ]
 
-block :: Parser ([Stx.Stat], Stx.Expr)
+block :: Parser Stx.Expr
 block =
   choice
     [ char '{' *> spaces *> body <* spaces <* char '}'
@@ -122,7 +119,7 @@ funcArgs =
 
 func :: Parser Stx.Expr
 func =
-  uncurry <$> (Stx.Func <$> funcArgs) <*> block
+  Stx.Func <$> funcArgs <*> block
 
 atomicExpr :: Parser Stx.Expr
 atomicExpr = choice
