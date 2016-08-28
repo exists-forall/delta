@@ -6,6 +6,7 @@ module ParseIdent
   ( ident
   , path
   , escapableIdent
+  , escapable
   , keyword
 
   -- Lower-level combinators with explicit reserved word handling
@@ -14,6 +15,7 @@ module ParseIdent
   , moduleIdent'
   , varIdent'
   , typeIdent'
+  , typeVarIdent'
   , path'
   )
 where
@@ -26,6 +28,8 @@ reservedWord :: Parser String
 reservedWord =
   choice $ map (try . (<* notFollowedBy identChar) . string)
     [ "do"
+    , "Pure"
+    , "Never"
     ]
 
 data CheckReserved = AllowReserved | ForbidReserved
@@ -95,6 +99,12 @@ typeIdent' reserved =
   try $ checkReserved reserved $
   Stx.TypeIdent <$> upperLetter <*> many identChar
 
+typeVarIdent' :: CheckReserved -> Parser Stx.TypeVarIdent
+typeVarIdent' reserved =
+  flip label "type variable" $
+  try $ checkReserved reserved $
+  Stx.TypeVarIdent <$> lowerLetter <*> many identChar
+
 path' :: CheckReserved -> Parser [Stx.ModuleIdent]
 path' reserved = many (try $ moduleIdent' reserved <* spaces <* char ':' <* char ':' <* spaces)
 
@@ -106,6 +116,13 @@ escapableIdent =
   choice
     [ flip Stx.VarIdent (Stx.BodySlot Stx.EmptyTail) <$> ident' ForbidReserved
     , try $ char '`' *> spaces *> ParseIdent.varIdent' AllowReserved <* spaces <* char '`'
+    ]
+
+escapable :: (CheckReserved -> Parser a) -> Parser a
+escapable p =
+  choice
+    [ p ForbidReserved
+    , try $ char '`' *> spaces *> p AllowReserved <* spaces <* char '`'
     ]
 
 keyword :: String -> Parser String

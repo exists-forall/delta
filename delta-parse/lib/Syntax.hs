@@ -45,9 +45,6 @@ data TypeVarIdent = TypeVarIdent Letter [IdentChar] deriving (Eq, Ord, Show)
 data ModuleIdent = ModuleIdent Letter [IdentChar] deriving (Eq, Ord, Show)
 data Path a = Path [ModuleIdent] a deriving (Eq, Ord, Show)
 
-type VarPath = Path VarIdent
-type TypePath = Path TypeIdent
-
 data StringComponent = Char Char | Interpolate Expr deriving (Eq, Ord, Show)
 
 data Pat
@@ -68,6 +65,18 @@ data Expr
   | Func Pat Expr
   | Let Pat Expr Expr
   | Mark SourcePos Expr SourcePos
+  deriving (Eq, Ord, Show)
+
+data Type
+  = TypeAtom (Path TypeIdent)
+  | TypeVar TypeVarIdent
+  | TypeApp Type Type
+  | TypeTuple Type Type
+  | TypeFunc Type Type Type
+  | TypeInters Type Type
+  | TypePure
+  | TypeUnit
+  | TypeNever
   deriving (Eq, Ord, Show)
 
 -- For testing purposes:
