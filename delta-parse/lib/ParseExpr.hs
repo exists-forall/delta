@@ -8,7 +8,7 @@ import ParseUtils
 import Data.Text (Text)
 
 import qualified Syntax as Stx
-import ParseIdent (ident, path, escapableIdent, keyword)
+import ParseIdent (ident, path, escapableIdent, keyword, operatorIdent)
 import ParsePat (pat)
 import Precedence
 import DeltaPrecedence
@@ -182,35 +182,10 @@ suffixes =
     <*> (atomicExpr <* spaces)
     <*> many (markedSuffix <* spaces)
 
-funOp :: Parser Stx.OperatorIdent
-funOp =
-  choice
-    [ char '+' *> pure Stx.OpAdd
-    , char '-' *> pure Stx.OpSub
-    , char '*' *> pure Stx.OpMul
-    , char '/' *> pure Stx.OpDiv
-
-    , try (string "==") *> pure Stx.OpEqu
-    , try (string "=/=") *> pure Stx.OpNotEqu
-    , try (string ">=") *> pure Stx.OpGTE
-    , try (string "<=") *> pure Stx.OpLTE
-
-    , try (string "<<") *> pure Stx.OpCompLeft
-    , try (string ">>") *> pure Stx.OpCompRight
-
-    , char '<' *> pure Stx.OpLT
-    , char '>' *> pure Stx.OpGT
-
-    , string "&&" *> pure Stx.OpAnd
-    , try (string "||") *> pure Stx.OpOr -- `try` to prevent ambiguities with closure arguments
-
-    , char '@' *> pure Stx.OpAt
-    ]
-
 operator :: Parser BinaryOperator
 operator =
   choice
-    [ FunOp <$> funOp
+    [ FunOp <$> operatorIdent
     , char ',' *> pure TupleOp
     ]
 

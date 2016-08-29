@@ -139,6 +139,9 @@ test = describe "ParseExpr" $ do
     it "parses escaped dot-function-style identifiers" $
       parseExpr "` . e ( ) f ( ) `" `shouldBe` Right e
 
+    it "parses escaped binary operators" $
+      parseExpr "` + `" `shouldBe` Right (Var (Path [] (OperatorIdent OpAdd)))
+
     it "parses unsigned integer literals" $
       parseExpr "42" `shouldBe` Right (LitUInt 42)
 

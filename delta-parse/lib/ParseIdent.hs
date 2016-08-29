@@ -8,6 +8,7 @@ module ParseIdent
   , escapableIdent
   , escapable
   , keyword
+  , operatorIdent
 
   -- Lower-level combinators with explicit reserved word handling
   , CheckReserved (..)
@@ -90,6 +91,32 @@ varIdent' reserved =
     , (flip Stx.VarIdent (Stx.BodySlot Stx.EmptyTail)) <$> ident' reserved
     , try $ char '.' *> spaces *>
       (Stx.DotVarIdent <$> ident' reserved <*> (spaces *> varIdentTail' reserved))
+    , try $ Stx.OperatorIdent <$> operatorIdent
+    ]
+
+operatorIdent :: Parser Stx.OperatorIdent
+operatorIdent =
+  choice
+    [ char '+' *> pure Stx.OpAdd
+    , char '-' *> pure Stx.OpSub
+    , char '*' *> pure Stx.OpMul
+    , char '/' *> pure Stx.OpDiv
+
+    , try (string "==") *> pure Stx.OpEqu
+    , try (string "=/=") *> pure Stx.OpNotEqu
+    , try (string ">=") *> pure Stx.OpGTE
+    , try (string "<=") *> pure Stx.OpLTE
+
+    , try (string "<<") *> pure Stx.OpCompLeft
+    , try (string ">>") *> pure Stx.OpCompRight
+
+    , char '<' *> pure Stx.OpLT
+    , char '>' *> pure Stx.OpGT
+
+    , string "&&" *> pure Stx.OpAnd
+    , try (string "||") *> pure Stx.OpOr -- `try` to prevent ambiguities with closure arguments
+
+    , char '@' *> pure Stx.OpAt
     ]
 
 typeIdent' :: CheckReserved -> Parser Stx.TypeIdent
