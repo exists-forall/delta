@@ -164,3 +164,20 @@ test = describe "ParseIdent" $ do
 
     it "rejects type identifiers starting with a digit" $
       fullParse (typeIdent' AllowReserved) "42Foo" `shouldSatisfy` isLeft
+
+  describe "path" $ do
+    it "parses simple paths" $
+      fullParse path "M::" `shouldBe` Right [ModuleIdent M []]
+
+    it "parses paths with multiple components" $
+      fullParse path "M::N::" `shouldBe` Right [ModuleIdent M [], ModuleIdent N []]
+
+    it "parses paths with whitespace between components" $
+      fullParse path "M :: N ::" `shouldBe` Right [ModuleIdent M [], ModuleIdent N []]
+
+    it "rejects paths containing reserved words" $
+      fullParse path "M::Pure::" `shouldSatisfy` isLeft
+
+    it "parses paths containing escaped reserved words" $
+      fullParse path "M :: ` Pure ` ::" `shouldBe`
+        Right [ModuleIdent M [], ModuleIdent P $ map (StartChar . Alpha LowerCase) [U, R, E]]

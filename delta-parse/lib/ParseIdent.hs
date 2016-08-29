@@ -16,7 +16,6 @@ module ParseIdent
   , varIdent'
   , typeIdent'
   , typeVarIdent'
-  , path'
   )
 where
 
@@ -105,11 +104,8 @@ typeVarIdent' reserved =
   try $ checkReserved reserved $
   Stx.TypeVarIdent <$> lowerLetter <*> many identChar
 
-path' :: CheckReserved -> Parser [Stx.ModuleIdent]
-path' reserved = many (try $ moduleIdent' reserved <* spaces <* char ':' <* char ':' <* spaces)
-
 path :: Parser [Stx.ModuleIdent]
-path = path' ForbidReserved
+path = many (try $ escapable moduleIdent' <* spaces <* char ':' <* char ':' <* spaces)
 
 escapableIdent :: Parser Stx.VarIdent
 escapableIdent =
