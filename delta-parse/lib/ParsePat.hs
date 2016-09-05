@@ -1,5 +1,6 @@
 module ParsePat
   ( pat
+  , typedPat
   )
 where
 
@@ -9,32 +10,45 @@ import qualified Syntax as Stx
 import ParseIdent (escapableIdent)
 import ParseType (possibleFunc)
 
-markPat :: Parser Stx.Pat -> Parser Stx.Pat
+markPat :: Parser (Stx.Pat' annot) -> Parser (Stx.Pat' annot)
 markPat p = Stx.MarkPat <$> getPosition <*> p <*> getPosition
 
-patVar :: Parser Stx.Pat
-patVar =
+patVar :: Parser annot -> Parser (Stx.Pat' annot)
+patVar annot =
   markPat $
   Stx.PatVar
     <$> (escapableIdent <* spaces)
-    <*> optionMaybe (char ':' *> spaces *> possibleFunc)
+    <*> annot
 
-patIgnore :: Parser Stx.Pat
-patIgnore = markPat $ char '_' *> pure Stx.PatIgnore
+patIgnore :: Parser annot -> Parser (Stx.Pat' annot)
+patIgnore annot = markPat $ Stx.PatIgnore <$> (char '_' *> spaces *> annot)
 
-parenthesizedPat :: Parser Stx.Pat
-parenthesizedPat = markPat $ char '(' *> spaces *> option Stx.PatUnit pat <* spaces <* char ')'
+parenthesizedPat :: Parser annot -> Parser (Stx.Pat' annot)
+parenthesizedPat annot =
+  markPat $
+  char '(' *> spaces *> option Stx.PatUnit (pat' annot) <* spaces <* char ')'
 
-atomicPat :: Parser Stx.Pat
-atomicPat =
+atomicPat :: Parser annot -> Parser (Stx.Pat' annot)
+atomicPat annot =
   choice
-    [ parenthesizedPat
-    , patIgnore
-    , patVar
+    [ parenthesizedPat annot
+    , patIgnore annot
+    , patVar annot
     ]
 
-patTuple :: Parser Stx.Pat
-patTuple = markPat $ foldr1 Stx.PatTuple <$> sepBy1 (atomicPat <* spaces) (char ',' <* spaces)
+patTuple :: Parser annot -> Parser (Stx.Pat' annot)
+patTuple annot =
+  markPat $
+  foldr1 Stx.PatTuple <$> sepBy1 (atomicPat annot <* spaces) (char ',' <* spaces)
+
+pat' :: Parser annot -> Parser (Stx.Pat' annot)
+pat' annot = patTuple annot
+
+typeAnnotation :: Parser Stx.Type
+typeAnnotation = char ':' *> spaces *> possibleFunc
 
 pat :: Parser Stx.Pat
-pat = patTuple
+pat = pat' $ optionMaybe typeAnnotation
+
+typedPat :: Parser Stx.TypedPat
+typedPat = pat' typeAnnotation

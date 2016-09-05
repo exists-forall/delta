@@ -120,6 +120,8 @@ test = describe "ParseExpr" $ do
          $ BodySlot
          $ EmptyTail
 
+    ignore = PatIgnore Nothing
+
   describe "expr" $ do
     it "parses simple identifiers" $
       parseExpr "x" `shouldBe` Right x
@@ -194,13 +196,13 @@ test = describe "ParseExpr" $ do
       parseExpr "f [ 1 ; 2 ]" `shouldBe` Right (Call f (LitSeq [LitUInt 1, LitUInt 2]))
 
     it "parses function calls with naked function arguments with no argument list" $
-      parseExpr "f { x }" `shouldBe` Right (Call f (Func PatIgnore x))
+      parseExpr "f { x }" `shouldBe` Right (Call f (Func ignore x))
 
     it "parses function calls with naked function arguments with argument lists" $
       parseExpr "f | x | { x }" `shouldBe` Right (Call f (Func xPat x))
 
     it "parses function calls with naked 'do'-notation function arguments with no argument list" $
-      parseExpr "f do x" `shouldBe` Right (Call f (Func PatIgnore x))
+      parseExpr "f do x" `shouldBe` Right (Call f (Func ignore x))
 
     it "parses function calls with naked 'do'-notation function arguments with argument lists" $
       parseExpr "f | x | do x" `shouldBe` Right (Call f (Func xPat x))
@@ -286,49 +288,49 @@ test = describe "ParseExpr" $ do
       parseExpr "f ( x , M::N::y )" `shouldBe` Right (Call f (Tuple x y))
 
     it "parses simple functions" $
-      parseExpr "{ x }" `shouldBe` Right (Func PatIgnore x)
+      parseExpr "{ x }" `shouldBe` Right (Func ignore x)
 
     it "parses function with arguments" $
       parseExpr "| x | { x }" `shouldBe` Right (Func xPat x)
 
     it "parses functions with assignments" $
-      parseExpr "{ x = M::N::y ; x }" `shouldBe` Right (Func PatIgnore $ Let xPat y x)
+      parseExpr "{ x = M::N::y ; x }" `shouldBe` Right (Func ignore $ Let xPat y x)
 
     it "parses functions with evaluation statements" $
-      parseExpr "{ f ( ) ; x }" `shouldBe` Right (Func PatIgnore $ Let PatIgnore (Call f Unit) x)
+      parseExpr "{ f ( ) ; x }" `shouldBe` Right (Func ignore $ Let ignore (Call f Unit) x)
 
     it "parses functions which implicitly return unit" $
-      parseExpr "{ f ( ) ; }" `shouldBe` Right (Func PatIgnore $ Let PatIgnore (Call f Unit) Unit)
+      parseExpr "{ f ( ) ; }" `shouldBe` Right (Func ignore $ Let ignore (Call f Unit) Unit)
 
     it "parses functions with multiple statements" $
       parseExpr "{ f ( ) ; x = M::N::y ; x }" `shouldBe`
-        Right (Func PatIgnore $ Let PatIgnore (Call f Unit) $ Let xPat y x)
+        Right (Func ignore $ Let ignore (Call f Unit) $ Let xPat y x)
 
     it "parses simple 'do'-notation functions" $
-      parseExpr "do x" `shouldBe` Right (Func PatIgnore x)
+      parseExpr "do x" `shouldBe` Right (Func ignore x)
 
     it "parses 'do'-notation functions with arguments" $
       parseExpr "| x | do x" `shouldBe` Right (Func xPat x)
 
     it "parses 'do'-notation functions with assignments" $
-      parseExpr "do x = M::N::y ; x" `shouldBe` Right (Func PatIgnore $ Let xPat y x)
+      parseExpr "do x = M::N::y ; x" `shouldBe` Right (Func ignore $ Let xPat y x)
 
     it "parses 'do'-notation functions with evaluation statements" $
-      parseExpr "do f ( ) ; x" `shouldBe` Right (Func PatIgnore $ Let PatIgnore (Call f Unit) x)
+      parseExpr "do f ( ) ; x" `shouldBe` Right (Func ignore $ Let ignore (Call f Unit) x)
 
     it "parses 'do'-notation functions which implicitly return unit" $
-      parseExpr "do f ( ) ;" `shouldBe` Right (Func PatIgnore $ Let PatIgnore (Call f Unit) Unit)
+      parseExpr "do f ( ) ;" `shouldBe` Right (Func ignore $ Let ignore (Call f Unit) Unit)
 
     it "parses functions with multiple statements" $
       parseExpr "do f ( ) ; x = M::N::y ; x" `shouldBe`
-        Right (Func PatIgnore $ Let PatIgnore (Call f Unit) $ Let xPat y x)
+        Right (Func ignore $ Let ignore (Call f Unit) $ Let xPat y x)
 
     it "parses 'do'-notation functions with no space between 'do' and the body" $
-      parseExpr "do()" `shouldBe` Right (Func PatIgnore Unit)
+      parseExpr "do()" `shouldBe` Right (Func ignore Unit)
 
     it "parses 'do'-notation functions not terminated by EOF" $
       parseExpr "( do f ( ) ; x = M::N::y ; x )" `shouldBe`
-        Right (Func PatIgnore $ Let PatIgnore (Call f Unit) $ Let xPat y x)
+        Right (Func ignore $ Let ignore (Call f Unit) $ Let xPat y x)
 
     it "parses nested 'do'-notation functions" $
       parseExpr "f do x ; M::N::G do h ( ) ( ) ; M::N::y" `shouldBe`
@@ -336,17 +338,17 @@ test = describe "ParseExpr" $ do
           (Call
             f
             (Func
-              PatIgnore
-              $ Let PatIgnore x
-              (Call g (Func PatIgnore $ Let PatIgnore (Call h (Tuple Unit Unit)) y))))
+              ignore
+              $ Let ignore x
+              (Call g (Func ignore $ Let ignore (Call h (Tuple Unit Unit)) y))))
 
     -- If assignment statements are not parsed carefully, this test will not pass.
     it "parses functions with statements which are invocations of operators beginning with '='" $
       parseExpr "{ x == M::N::y ; }" `shouldBe`
-        Right (Func PatIgnore $ Let PatIgnore (Call equ (Tuple x y)) Unit)
+        Right (Func ignore $ Let ignore (Call equ (Tuple x y)) Unit)
 
     it "parses empty functions" $
-      parseExpr "{}" `shouldBe` Right (Func PatIgnore Unit)
+      parseExpr "{}" `shouldBe` Right (Func ignore Unit)
 
     it "parses comments as insignificant whitespace" $
       parseExpr "f//comment\n(x)" `shouldBe` Right (Call f x)

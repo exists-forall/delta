@@ -99,7 +99,7 @@ letBinding =
   (,) <$> try (pat <* spaces <* notFollowedBy operator <* char '=') <*> (spaces *> expr)
 
 assembleEvalOrRet :: Stx.Expr -> Maybe Stx.Expr -> Stx.Expr
-assembleEvalOrRet e (Just ret) = Stx.Let Stx.PatIgnore e ret
+assembleEvalOrRet e (Just ret) = Stx.Let (Stx.PatIgnore Nothing) e ret
 assembleEvalOrRet e Nothing = e
 
 body :: Parser Stx.Expr
@@ -119,7 +119,7 @@ block =
 
 funcArgs :: Parser Stx.Pat
 funcArgs =
-  option Stx.PatIgnore $
+  option (Stx.PatIgnore Nothing) $
   notFollowedBy operator *> char '|' *> spaces *> pat <* spaces <* char '|' <* spaces
 
 func :: Parser Stx.Expr
