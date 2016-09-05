@@ -4,6 +4,8 @@ module ParseUtils
   , both
   , rangeParser
   , spaces
+  , sepByTrailing
+  , semicolonDelimited
   , fullParse
   )
 where
@@ -29,6 +31,13 @@ lineComment = try (string "//") *> skipMany (noneOf "\r\n")
 
 spaces :: Parser ()
 spaces = skipMany ((ParsecChar.space *> pure ()) <|> lineComment)
+
+sepByTrailing :: Parser a -> Parser sep -> Parser [a]
+sepByTrailing item sep =
+  option [] ((:) <$> item <*> option [] (sep *> sepByTrailing item sep))
+
+semicolonDelimited :: Parser a -> Parser [a]
+semicolonDelimited p = sepByTrailing (p <* spaces) (char ';' *> spaces)
 
 -- Mostly for testing
 fullParse :: Parser a -> Text -> Either ParseError a

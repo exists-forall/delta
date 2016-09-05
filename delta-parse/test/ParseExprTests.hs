@@ -169,6 +169,18 @@ test = describe "ParseExpr" $ do
       parseExpr "\"x=\\(x)!\"" `shouldBe`
         Right (LitString [Char 'x', Char '=', Interpolate x, Char '!'])
 
+    it "parses empty sequences" $
+      parseExpr "[ ]" `shouldBe` Right (LitSeq [])
+
+    it "parses single-item sequences" $
+      parseExpr "[ x ]" `shouldBe` Right (LitSeq [x])
+
+    it "parses multi-item sequences without trailing semicolons" $
+      parseExpr "[ 1 ; 2 ]" `shouldBe` Right (LitSeq [LitUInt 1, LitUInt 2])
+
+    it "parses multi-item sequences with trailing semiciolons" $
+      parseExpr "[ 1 ; 2 ; ]" `shouldBe` Right (LitSeq [LitUInt 1, LitUInt 2])
+
     it "parses nullary function calls" $
       parseExpr "f()" `shouldBe` Right (Call f Unit)
 
@@ -177,6 +189,9 @@ test = describe "ParseExpr" $ do
 
     it "parses function calls with naked string arguments" $
       parseExpr "f \"x\"" `shouldBe` Right (Call f (LitString [Char 'x']))
+
+    it "parses function calls with naked sequence arguments" $
+      parseExpr "f [ 1 ; 2 ]" `shouldBe` Right (Call f (LitSeq [LitUInt 1, LitUInt 2]))
 
     it "parses function calls with naked function arguments with no argument list" $
       parseExpr "f { x }" `shouldBe` Right (Call f (Func PatIgnore x))

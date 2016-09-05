@@ -59,6 +59,7 @@ data Expr
   = Var (Path VarIdent)
   | LitUInt Natural
   | LitString [StringComponent]
+  | LitSeq [Expr]
   | Unit
   | Tuple Expr Expr
   | Call Expr Expr
@@ -94,6 +95,7 @@ stripMarks (LitUInt i) = LitUInt i
 stripMarks (LitString s) = LitString (map stripComponentMarks s) where
   stripComponentMarks (Char c) = Char c
   stripComponentMarks (Interpolate e) = Interpolate (stripMarks e)
+stripMarks (LitSeq xs) = LitSeq (map stripMarks xs)
 stripMarks Unit = Unit
 stripMarks (Tuple a b) = Tuple (stripMarks a) (stripMarks b)
 stripMarks (Call a b) = Call (stripMarks a) (stripMarks b)

@@ -26,6 +26,7 @@ slot =
   choice
     [ parenthesized
     , litString
+    , litSeq
     , func
     ]
 
@@ -89,6 +90,10 @@ litString :: Parser Stx.Expr
 litString = mark $
   Stx.LitString <$> (char '"' *> many stringComponent <* char '"')
 
+litSeq :: Parser Stx.Expr
+litSeq = mark $
+  Stx.LitSeq <$> (char '[' *> spaces *> semicolonDelimited expr <* spaces <* char ']')
+
 letBinding :: Parser (Stx.Pat, Stx.Expr)
 letBinding =
   (,) <$> try (pat <* spaces <* notFollowedBy operator <* char '=') <*> (spaces *> expr)
@@ -128,6 +133,7 @@ atomicExpr = choice
   , var
   , litUInt
   , litString
+  , litSeq
   , func
   ]
 
