@@ -1,5 +1,6 @@
 module ParseType
   ( type_
+  , possibleInters
   , possibleFunc
   )
 where

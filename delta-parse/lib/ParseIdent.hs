@@ -30,6 +30,7 @@ reservedWord =
     [ "do"
     , "Pure"
     , "Never"
+    , "def"
     ]
 
 data CheckReserved = AllowReserved | ForbidReserved

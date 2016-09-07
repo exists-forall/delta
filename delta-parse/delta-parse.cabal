@@ -29,6 +29,7 @@ library
                      , ParseExpr
                      , ParsePat
                      , ParseType
+                     , ParseDecl
                      , Precedence
                      , DeltaPrecedence
 
@@ -57,6 +58,9 @@ test-suite delta-parse-tests
 
                      , ParseType
                      , ParseTypeTests
+
+                     , ParseDecl
+                     , ParseDeclTests
 
                      , Precedence
 

@@ -83,6 +83,11 @@ data Type
   | TypeNever
   deriving (Eq, Ord, Show)
 
+data Decl
+  = DeclDef TypedPat Expr
+  | MarkDecl SourcePos Decl SourcePos
+  deriving (Eq, Ord, Show)
+
 -- For testing purposes:
 
 stripPatMarks :: Pat' annot -> Pat' annot
@@ -105,3 +110,7 @@ stripMarks (Call a b) = Call (stripMarks a) (stripMarks b)
 stripMarks (Func pat ret) = Func (stripPatMarks pat) (stripMarks ret)
 stripMarks (Let pat e ret) = Let (stripPatMarks pat) (stripMarks e) (stripMarks ret)
 stripMarks (Mark _ e _) = stripMarks e
+
+stripDeclMarks :: Decl -> Decl
+stripDeclMarks (DeclDef p e) = DeclDef (stripPatMarks p) (stripMarks e)
+stripDeclMarks (MarkDecl _ d _) = stripDeclMarks d
