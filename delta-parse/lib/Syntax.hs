@@ -91,7 +91,13 @@ data StructComponent
 data Decl
   = DeclDef TypedPat Expr
   | DeclTypeStruct TypeIdent [TypeVarIdent] [StructComponent]
+  | DeclProtocol TypeIdent TypeVarIdent [Stub]
   | MarkDecl SourcePos Decl SourcePos
+  deriving (Eq, Ord, Show)
+
+data Stub
+  = StubDef VarIdent Type
+  | StubImplement TypeIdent Type
   deriving (Eq, Ord, Show)
 
 -- For testing purposes:
@@ -120,4 +126,5 @@ stripMarks (Mark _ e _) = stripMarks e
 stripDeclMarks :: Decl -> Decl
 stripDeclMarks (DeclDef p e) = DeclDef (stripPatMarks p) (stripMarks e)
 stripDeclMarks (DeclTypeStruct t vs cs) = DeclTypeStruct t vs cs
+stripDeclMarks (DeclProtocol p t s) = DeclProtocol p t s
 stripDeclMarks (MarkDecl _ d _) = stripDeclMarks d

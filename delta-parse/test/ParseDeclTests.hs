@@ -38,6 +38,9 @@ simpleType l = TypeAtom $ Path [] $ simpleTIdent l
 
 test :: Spec
 test = describe "ParseDecl" $ do
+  let typeIdentPure = TypeIdent P $ map (StartChar . Alpha LowerCase) [U, R, E]
+  let typeVarDo = TypeVarIdent D [StartChar $ Alpha LowerCase O]
+
   describe "function defs" $ do
     describe "standard-notation defs" $ do
       let
@@ -286,7 +289,7 @@ test = describe "ParseDecl" $ do
 
     it "parses structs with escaped names" $
       parseDecl "type `Pure` { }" `shouldBe` Right
-        (DeclTypeStruct (TypeIdent P $ map (StartChar . Alpha LowerCase) [U, R, E]) [] [])
+        (DeclTypeStruct typeIdentPure [] [])
 
     it "parses structs with type parameters" $
       parseDecl "type A < b > < c > { }" `shouldBe` Right
@@ -294,7 +297,7 @@ test = describe "ParseDecl" $ do
 
     it "parses structs with escaped type parameter names" $
       parseDecl "type A < `do` > { }" `shouldBe` Right
-        (DeclTypeStruct (simpleTIdent A) [TypeVarIdent D [StartChar $ Alpha LowerCase O]] [])
+        (DeclTypeStruct (simpleTIdent A) [typeVarDo] [])
 
     it "parses structs with fields" $
       parseDecl "type A { x : B ; }" `shouldBe` Right
@@ -383,5 +386,86 @@ test = describe "ParseDecl" $ do
         (DeclTypeStruct
           (simpleTIdent A)
           []
-          [StructCase (TypeIdent P $ map (StartChar . Alpha LowerCase) [U, R, E]) []]
+          [StructCase typeIdentPure []]
+        )
+
+  describe "protocols" $ do
+    it "parses minimal protocols" $
+      parseDecl "protocol A < t > { }" `shouldBe` Right
+        (DeclProtocol (simpleTIdent A) (simpleTypeVar T) [])
+
+    it "parses protocols with escaped names" $
+      parseDecl "protocol `Pure` < t > { }" `shouldBe` Right
+        (DeclProtocol typeIdentPure (simpleTypeVar T) [])
+
+    it "parses protocols with escaped type variable names" $
+      parseDecl "protocol A < `do` > { }" `shouldBe` Right
+        (DeclProtocol (simpleTIdent A) typeVarDo [])
+
+    -- def stubs are implemented with the same logic as ordinary defs, so it's not crucial to test
+    -- them as thoroughly as defs.
+
+    it "parses protocols with minimal def stubs" $
+      parseDecl "protocol A < t > { def f ( ) ; }" `shouldBe` Right
+        (DeclProtocol
+          (simpleTIdent A)
+          (simpleTypeVar T)
+          [StubDef (simpleVar F) (TypeFunc TypeUnit TypePure TypeUnit)]
+        )
+
+    it "parses protocols with nontrivial def stubs" $
+      parseDecl "protocol A < t > { def f ( A ) g ( B ) ! C -> D ; }" `shouldBe` Right
+        (DeclProtocol
+          (simpleTIdent A)
+          (simpleTypeVar T)
+          [StubDef
+            (VarIdent (simpleIdent F) $ BodySlot $ TailWord (simpleIdent G) $ TailSlot $ EmptyTail)
+            (TypeFunc (TypeTuple (simpleType A) (simpleType B)) (simpleType C) (simpleType D))
+          ]
+        )
+
+    it "parses protocols with minimal dot-notation def stubs" $
+      parseDecl "protocol A < t > { def ( ) . f ; }" `shouldBe` Right
+        (DeclProtocol
+          (simpleTIdent A)
+          (simpleTypeVar T)
+          [StubDef (DotVarIdent (simpleIdent F) $ EmptyTail) (TypeFunc TypeUnit TypePure TypeUnit)]
+        )
+
+    it "parses protocols with nontrivial dot-notation def stubs" $
+      parseDecl "protocol A < t > { def ( A ) . f ( B ) g ( C ) ! D -> E ; }" `shouldBe` Right
+        (DeclProtocol
+          (simpleTIdent A)
+          (simpleTypeVar T)
+          [StubDef
+            ( DotVarIdent (simpleIdent F)
+            $ TailSlot
+            $ TailWord (simpleIdent G)
+            $ TailSlot
+            $ EmptyTail
+            )
+            (TypeFunc
+              (TypeTuple (simpleType A) $ TypeTuple (simpleType B) (simpleType C))
+              (simpleType D)
+              (simpleType E)
+            )
+          ]
+        )
+
+    it "parses protocols with implement stubs" $
+      parseDecl "protocol A < t > { implement B < C > ; }" `shouldBe` Right
+        (DeclProtocol
+          (simpleTIdent A)
+          (simpleTypeVar T)
+          [StubImplement (simpleTIdent B) (simpleType C)]
+        )
+
+    it "parses protocols with multiple stubs" $
+      parseDecl "protocol A < t > { def f ( ) ; def g ( ) ; }" `shouldBe` Right
+        (DeclProtocol
+          (simpleTIdent A)
+          (simpleTypeVar T)
+          [ StubDef (simpleVar F) (TypeFunc TypeUnit TypePure TypeUnit)
+          , StubDef (simpleVar G) (TypeFunc TypeUnit TypePure TypeUnit)
+          ]
         )

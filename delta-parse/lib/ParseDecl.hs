@@ -13,7 +13,7 @@ import ParsePat (typedPat)
 import ParseType (possibleFunc, possibleInters, type_)
 import ParseExpr (body)
 
-import Data.Bifunctor (first, second, bimap)
+import Data.Bifunctor (first, second)
 
 markDecl :: Parser Stx.Decl -> Parser Stx.Decl
 markDecl p = Stx.MarkDecl <$> getPosition <*> p <*> getPosition
@@ -70,6 +70,40 @@ def =
   keyword "def" *> spaces *>
     (assembleDef <$> sig defSlot <*> (spaces *> char '{' *> spaces *> body <* spaces <* char '}'))
 
+stubDefSlot :: Parser Stx.Type
+stubDefSlot = char '(' *> spaces *> option Stx.TypeUnit type_ <* spaces <* char ')'
+
+assembleStubDef :: Sig Stx.Type -> Stx.Stub
+assembleStubDef (Sig name argType interType retType) =
+  Stx.StubDef name $ Stx.TypeFunc (foldr1 Stx.TypeTuple argType) interType retType
+
+stubDef :: Parser Stx.Stub
+stubDef =
+  keyword "def" *> spaces *> (assembleStubDef <$> sig stubDefSlot) <* spaces <* char ';'
+
+stubImplement :: Parser Stx.Stub
+stubImplement =
+  keyword "implement" *> spaces *>
+  (Stx.StubImplement
+    <$> (escapable typeIdent' <* spaces)
+    <*> (char '<' *> spaces *> type_ <* spaces <* char '>')
+  ) <* spaces <* char ';'
+
+stub :: Parser Stx.Stub
+stub =
+  choice
+    [ stubDef
+    , stubImplement
+    ]
+
+protocol :: Parser Stx.Decl
+protocol =
+  markDecl $
+  Stx.DeclProtocol
+    <$> (keyword "protocol" *> spaces *> escapable typeIdent' <* spaces)
+    <*> (char '<' *> spaces *> escapable typeVarIdent' <* spaces <* char '>' <* spaces)
+    <*> (char '{' *> spaces *> many (stub <* spaces) <* char '}')
+
 caseBody :: Parser [Stx.StructComponent]
 caseBody =
   (char ';' *> pure []) <|> structBody
@@ -104,4 +138,5 @@ decl =
   choice
     [ def
     , typeStruct
+    , protocol
     ]
