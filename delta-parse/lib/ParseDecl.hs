@@ -31,21 +31,16 @@ extractType Stx.PatUnit = (Stx.PatUnit, Stx.TypeUnit)
 extractType (Stx.MarkPat pos1 p pos2) = first (flip (Stx.MarkPat pos1) pos2) (extractType p)
 extractType (Stx.PatTuple a b) = tupleBoth (extractType a) (extractType b)
 
-sigSlot :: Parser Stx.TypedPat
-sigSlot = char '(' *> spaces *> option Stx.PatUnit typedPat <* spaces <* char ')'
+data Sig slot = Sig Stx.VarIdent [slot] Stx.Type Stx.Type
 
-sigLhsDot :: Parser (Stx.VarIdent, [Stx.TypedPat])
-sigLhsDot =
-  second <$> ((:) <$> sigSlot) <*>
-    (spaces *> char '.' *> spaces *> varIdentDotSuffixWithSlot' ForbidReserved sigSlot)
-
-sigLhs :: Parser (Stx.VarIdent, (Stx.Pat, Stx.Type))
-sigLhs =
-  second (foldr1 tupleBoth . map extractType) <$>
-    choice
-      [ varIdentNonDotWithSlot' ForbidReserved sigSlot
-      , sigLhsDot
-      ]
+sigArgs :: Parser slot -> Parser (Stx.VarIdent, [slot])
+sigArgs slot =
+  choice
+    [ varIdentNonDotWithSlot' ForbidReserved slot
+    , second
+      <$> ((:) <$> slot)
+      <*> (spaces *> char '.' *> spaces *> varIdentDotSuffixWithSlot' ForbidReserved slot)
+    ]
 
 sigInterType :: Parser Stx.Type
 sigInterType =
@@ -55,27 +50,25 @@ sigRetType :: Parser Stx.Type
 sigRetType =
   option Stx.TypeUnit $ string "->" *> spaces *> possibleFunc
 
-assembleSig ::
-  (Stx.VarIdent, (Stx.Pat, Stx.Type)) ->
-  Stx.Type ->
-  Stx.Type ->
-  (Stx.VarIdent, (Stx.Pat, Stx.Type))
+sig :: Parser slot -> Parser (Sig slot)
+sig slot = uncurry Sig <$> (sigArgs slot <* spaces) <*> (sigInterType <* spaces) <*> sigRetType
 
-assembleSig (name, (lhsPat, argType)) interType retType =
-  (name, (lhsPat, Stx.TypeFunc argType interType retType))
+defSlot :: Parser Stx.TypedPat
+defSlot = char '(' *> spaces *> option Stx.PatUnit typedPat <* spaces <* char ')'
 
-sig :: Parser (Stx.VarIdent, (Stx.Pat, Stx.Type))
-sig = assembleSig <$> sigLhs <*> (spaces *> sigInterType <* spaces) <*> sigRetType
-
-assembleDef :: (Stx.VarIdent, (Stx.Pat, Stx.Type)) -> Stx.Expr -> Stx.Decl
-assembleDef (name, (argPat, funcType)) bodyExpr =
-  Stx.DeclDef (Stx.PatVar name funcType) (Stx.Func argPat bodyExpr)
+assembleDef :: Sig Stx.TypedPat -> Stx.Expr -> Stx.Decl
+assembleDef (Sig name args interType retType) bodyExpr =
+  let
+    (argPat, argType) = foldr1 tupleBoth $ map extractType args
+    funcType = Stx.TypeFunc argType interType retType
+  in
+    Stx.DeclDef (Stx.PatVar name funcType) (Stx.Func argPat bodyExpr)
 
 def :: Parser Stx.Decl
 def =
   markDecl $
   keyword "def" *> spaces *>
-    (assembleDef <$> sig <*> (spaces *> char '{' *> spaces *> body <* spaces <* char '}'))
+    (assembleDef <$> sig defSlot <*> (spaces *> char '{' *> spaces *> body <* spaces <* char '}'))
 
 caseBody :: Parser [Stx.StructComponent]
 caseBody =
