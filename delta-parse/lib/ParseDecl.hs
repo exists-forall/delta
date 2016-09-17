@@ -8,9 +8,9 @@ import ParseUtils
 import Data.Text (Text)
 
 import qualified Syntax as Stx
-import ParseIdent (ident, keyword)
+import ParseIdent (ident, keyword, escapable, ident', typeIdent', typeVarIdent')
 import ParsePat (typedPat)
-import ParseType (possibleFunc, possibleInters)
+import ParseType (possibleFunc, possibleInters, type_)
 import ParseExpr (body)
 
 import Data.Bifunctor (first, second, bimap)
@@ -99,8 +99,38 @@ def =
   keyword "def" *> spaces *>
     (assembleDef <$> sig <*> (spaces *> char '{' *> spaces *> body <* spaces <* char '}'))
 
+caseBody :: Parser [Stx.StructComponent]
+caseBody =
+  (char ';' *> pure []) <|> structBody
+
+structCase :: Parser Stx.StructComponent
+structCase =
+  keyword "case" *> (Stx.StructCase <$> (spaces *> escapable typeIdent' <* spaces) <*> caseBody)
+
+structField :: Parser Stx.StructComponent
+structField =
+  Stx.StructField
+    <$> (escapable ident' <* spaces)
+    <*> (char ':' *> spaces *> type_ <* spaces <* char ';')
+
+structComponent :: Parser Stx.StructComponent
+structComponent = structCase <|> structField
+
+structBody :: Parser [Stx.StructComponent]
+structBody = char '{' *> spaces *> many (structComponent <* spaces) <* spaces <* char '}'
+
+typeStruct :: Parser Stx.Decl
+typeStruct =
+  markDecl $
+  keyword "type" *>
+    (Stx.DeclTypeStruct
+      <$> (spaces *> escapable typeIdent' <* spaces)
+      <*> (many $ char '<' *> spaces *> escapable typeVarIdent' <* spaces <* char '>' <* spaces)
+      <*> structBody)
+
 decl :: Parser Stx.Decl
 decl =
   choice
     [ def
+    , typeStruct
     ]

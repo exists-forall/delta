@@ -31,6 +31,8 @@ reservedWord =
     , "Pure"
     , "Never"
     , "def"
+    , "type"
+    , "case"
     ]
 
 data CheckReserved = AllowReserved | ForbidReserved

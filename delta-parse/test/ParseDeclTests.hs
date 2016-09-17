@@ -27,8 +27,14 @@ simplePatVar l = PatVar (simpleVar l) Nothing
 simpleVarExpr :: Letter -> Expr
 simpleVarExpr l = Var $ Path [] $ simpleVar l
 
+simpleTIdent :: Letter -> TypeIdent
+simpleTIdent l = TypeIdent l []
+
+simpleTypeVar :: Letter -> TypeVarIdent
+simpleTypeVar l = TypeVarIdent l []
+
 simpleType :: Letter -> Type
-simpleType l = TypeAtom $ Path [] $ TypeIdent l []
+simpleType l = TypeAtom $ Path [] $ simpleTIdent l
 
 test :: Spec
 test = describe "ParseDecl" $ do
@@ -273,3 +279,109 @@ test = describe "ParseDecl" $ do
             (PatVar f (TypeFunc TypeUnit TypePure (simpleType A)))
             (Func PatUnit Unit)
           )
+
+  describe "type structures" $ do
+    it "parses minimal structs" $
+      parseDecl "type A { }" `shouldBe` Right (DeclTypeStruct (simpleTIdent A) [] [])
+
+    it "parses structs with escaped names" $
+      parseDecl "type `Pure` { }" `shouldBe` Right
+        (DeclTypeStruct (TypeIdent P $ map (StartChar . Alpha LowerCase) [U, R, E]) [] [])
+
+    it "parses structs with type parameters" $
+      parseDecl "type A < b > < c > { }" `shouldBe` Right
+        (DeclTypeStruct (simpleTIdent A) [simpleTypeVar B, simpleTypeVar C] [])
+
+    it "parses structs with escaped type parameter names" $
+      parseDecl "type A < `do` > { }" `shouldBe` Right
+        (DeclTypeStruct (simpleTIdent A) [TypeVarIdent D [StartChar $ Alpha LowerCase O]] [])
+
+    it "parses structs with fields" $
+      parseDecl "type A { x : B ; }" `shouldBe` Right
+        (DeclTypeStruct (simpleTIdent A) [] [StructField (simpleIdent X) (simpleType B)])
+
+    it "parses structs with escaped field names" $
+      parseDecl "type A { `do` : B ; }" `shouldBe` Right
+        (DeclTypeStruct
+          (simpleTIdent A)
+          []
+          [StructField (Ident (Alpha LowerCase D) [StartChar $ Alpha LowerCase O]) (simpleType B)]
+        )
+
+    it "parses structs with multiple fields" $
+      parseDecl "type A { x : B ; y : C ; }" `shouldBe` Right
+        (DeclTypeStruct
+          (simpleTIdent A)
+          []
+          [StructField (simpleIdent X) (simpleType B), StructField (simpleIdent Y) (simpleType C)]
+        )
+
+    it "parses structs with fields typed by unparenthesized tuples" $
+      parseDecl "type A { x : B , C ; }" `shouldBe` Right
+        (DeclTypeStruct
+          (simpleTIdent A)
+          []
+          [StructField (simpleIdent X) (TypeTuple (simpleType B) (simpleType C))]
+        )
+
+    it "parses structs with cases" $
+      parseDecl "type A { case B { } }" `shouldBe` Right
+        (DeclTypeStruct (simpleTIdent A) [] [StructCase (simpleTIdent B) []])
+
+    it "parses structs with cases with fields" $
+      parseDecl "type A { case B { x : C ; } }" `shouldBe` Right
+        (DeclTypeStruct
+          (simpleTIdent A)
+          []
+          [StructCase (simpleTIdent B) [StructField (simpleIdent X) (simpleType C)]]
+        )
+
+    it "parses structs with semicolon-notation empty cases" $
+      parseDecl "type A { case B ; }" `shouldBe` Right
+        (DeclTypeStruct (simpleTIdent A) [] [StructCase (simpleTIdent B) []])
+
+    it "rejects semicolon-notation empty structs" $
+      parseDecl "type A ;" `shouldSatisfy` isLeft
+
+    it "rejects cases with type parameters" $
+      parseDecl "type A { case B < t > { } }" `shouldSatisfy` isLeft
+
+    it "parses structs with multiple cases" $
+      parseDecl "type A { case B { } case C ; case D { } }" `shouldBe` Right
+        (DeclTypeStruct
+          (simpleTIdent A)
+          []
+          [ StructCase (simpleTIdent B) []
+          , StructCase (simpleTIdent C) []
+          , StructCase (simpleTIdent D) []
+          ]
+        )
+
+    it "parses structs with cases and fields interleaved" $
+      parseDecl "type A { x : B ; case C { } y : D ; case E ; z : F ; }" `shouldBe`
+        Right (DeclTypeStruct
+          (simpleTIdent A)
+          []
+          [ StructField (simpleIdent X) (simpleType B)
+          , StructCase (simpleTIdent C) []
+          , StructField (simpleIdent Y) (simpleType D)
+          , StructCase (simpleTIdent E) []
+          , StructField (simpleIdent Z) (simpleType F)
+          ]
+        )
+
+    it "parses nested cases" $
+      parseDecl "type A { case B { case C { } } }" `shouldBe` Right
+        (DeclTypeStruct
+          (simpleTIdent A)
+          []
+          [StructCase (simpleTIdent B) [StructCase (simpleTIdent C) []]]
+        )
+
+    it "parses cases with escaped names" $
+      parseDecl "type A { case `Pure` { } }" `shouldBe` Right
+        (DeclTypeStruct
+          (simpleTIdent A)
+          []
+          [StructCase (TypeIdent P $ map (StartChar . Alpha LowerCase) [U, R, E]) []]
+        )

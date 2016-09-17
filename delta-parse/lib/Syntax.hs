@@ -83,8 +83,14 @@ data Type
   | TypeNever
   deriving (Eq, Ord, Show)
 
+data StructComponent
+  = StructField Ident Type
+  | StructCase TypeIdent [StructComponent]
+  deriving (Eq, Ord, Show)
+
 data Decl
   = DeclDef TypedPat Expr
+  | DeclTypeStruct TypeIdent [TypeVarIdent] [StructComponent]
   | MarkDecl SourcePos Decl SourcePos
   deriving (Eq, Ord, Show)
 
@@ -113,4 +119,5 @@ stripMarks (Mark _ e _) = stripMarks e
 
 stripDeclMarks :: Decl -> Decl
 stripDeclMarks (DeclDef p e) = DeclDef (stripPatMarks p) (stripMarks e)
+stripDeclMarks (DeclTypeStruct t vs cs) = DeclTypeStruct t vs cs
 stripDeclMarks (MarkDecl _ d _) = stripDeclMarks d
