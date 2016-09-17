@@ -9,7 +9,7 @@ import ParseUtils
 import Data.Text (Text)
 
 import qualified Syntax as Stx
-import ParseIdent (ident, path, escapableIdent, keyword, operatorIdent)
+import ParseIdent
 import ParsePat (pat)
 import Precedence
 import DeltaPrecedence
@@ -31,26 +31,13 @@ slot =
     , func
     ]
 
-callTail :: Parser (Stx.VarIdentTail, [Stx.Expr])
-callTail =
-  choice
-    [ first <$> (Stx.TailWord <$> ident) <*> (spaces *> callTail)
-    , bimap Stx.TailSlot <$> ((:) <$> slot) <*> (spaces *> callTail)
-    , pure (Stx.EmptyTail, [])
-    ]
-
-callBody :: Parser (Stx.VarIdentBody, [Stx.Expr])
-callBody =
-  choice
-    [ first <$> (Stx.BodyWord <$> ident) <*> (spaces *> callBody)
-    , bimap Stx.BodySlot <$> ((:) <$> slot) <*> (spaces *> callTail)
-    ]
+qualifiedCall :: Parser (Stx.VarIdent, [Stx.Expr]) -> Parser (Stx.Path Stx.VarIdent, [Stx.Expr])
+qualifiedCall p = first <$> (Stx.Path <$> path) <*> p
 
 callNonDot :: Parser Stx.Expr
 callNonDot =
-  mark $ assemble <$> path <*> (first <$> (Stx.VarIdent <$> ident) <*> (spaces *> callBody)) where
-  assemble varPath (varIdent, args) =
-    Stx.Call (Stx.Var (Stx.Path varPath varIdent)) (foldr1 Stx.Tuple args)
+  mark $ assemble <$> qualifiedCall (varIdentNonDotWithSlot' ForbidReserved slot) where
+  assemble (varName, args) = Stx.Call (Stx.Var varName) (foldr1 Stx.Tuple args)
 
 var :: Parser Stx.Expr
 var = mark $ Stx.Var <$> (Stx.Path <$> path <*> escapableIdent)
@@ -145,10 +132,7 @@ data Suffix
 dotCall :: Parser Suffix
 dotCall =
   char '.' *> spaces *>
-  (uncurry SuffixDotCall <$>
-    (first
-      <$> ((.) <$> (Stx.Path <$> path) <*> (Stx.DotVarIdent <$> ident))
-      <*> (spaces *> callTail)))
+    (uncurry SuffixDotCall <$> qualifiedCall (varIdentDotSuffixWithSlot' ForbidReserved slot))
 
 suffixCall :: Parser Suffix
 suffixCall = SuffixCall <$> slot

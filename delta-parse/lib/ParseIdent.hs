@@ -14,6 +14,8 @@ module ParseIdent
   , CheckReserved (..)
   , ident'
   , moduleIdent'
+  , varIdentNonDotWithSlot'
+  , varIdentDotSuffixWithSlot'
   , varIdent'
   , typeIdent'
   , typeVarIdent'
@@ -23,6 +25,8 @@ where
 import ParseUtils
 
 import qualified Syntax as Stx
+
+import Data.Bifunctor (first, bimap)
 
 reservedWord :: Parser String
 reservedWord =
@@ -76,24 +80,46 @@ moduleIdent' reserved =
   try $ checkReserved reserved $
   Stx.ModuleIdent <$> upperLetter <*> many identChar
 
-varIdentTail' :: CheckReserved -> Parser Stx.VarIdentTail
-varIdentTail' reserved =
-  (Stx.TailWord <$> ident' reserved <*> (spaces *> varIdentTail' reserved)) <|>
-  (Stx.TailSlot <$> (char '(' *> spaces *> char ')' *> spaces *> varIdentTail' reserved)) <|>
-  pure Stx.EmptyTail
+varIdentTailWithSlot' :: CheckReserved -> Parser a -> Parser (Stx.VarIdentTail, [a])
+varIdentTailWithSlot' reserved slot =
+  choice
+    [ first
+      <$> (Stx.TailWord <$> ident' reserved)
+      <*> (spaces *> varIdentTailWithSlot' reserved slot)
+    , bimap Stx.TailSlot <$> ((:) <$> slot) <*> (spaces *> varIdentTailWithSlot' reserved slot)
+    , pure (Stx.EmptyTail, [])
+    ]
 
-varIdentBody' :: CheckReserved -> Parser Stx.VarIdentBody
-varIdentBody' reserved =
-  (Stx.BodyWord <$> ident' reserved <*> (spaces *> varIdentBody' reserved)) <|>
-  (Stx.BodySlot <$> (char '(' *> spaces *> char ')' *> spaces *> varIdentTail' reserved))
+varIdentBodyWithSlot' :: CheckReserved -> Parser a -> Parser (Stx.VarIdentBody, [a])
+varIdentBodyWithSlot' reserved slot =
+  choice
+    [ first
+      <$> (Stx.BodyWord <$> ident' reserved)
+      <*> (spaces *> varIdentBodyWithSlot' reserved slot)
+    , bimap Stx.BodySlot <$> ((:) <$> slot) <*> (spaces *> varIdentTailWithSlot' reserved slot)
+    ]
+
+varIdentNonDotWithSlot' :: CheckReserved -> Parser a -> Parser (Stx.VarIdent, [a])
+varIdentNonDotWithSlot' reserved slot =
+  first <$> (Stx.VarIdent <$> ident' reserved) <*> (spaces *> varIdentBodyWithSlot' reserved slot)
+
+{- NOTE:
+DOES NOT INCLUDE THE DOT ITSELF!
+e.g. matches the 'foo' in '.foo' or the 'bar () baz ()' in '.A::B::bar () baz ()'
+-}
+varIdentDotSuffixWithSlot' :: CheckReserved -> Parser a -> Parser (Stx.VarIdent, [a])
+varIdentDotSuffixWithSlot' reserved slot =
+ first <$> (Stx.DotVarIdent <$> ident' reserved) <*> (spaces *> varIdentTailWithSlot' reserved slot)
+
+trivialSlot :: Parser ()
+trivialSlot = char '(' *> spaces <* char ')'
 
 varIdent' :: CheckReserved -> Parser Stx.VarIdent
 varIdent' reserved =
   choice
-    [ try $ Stx.VarIdent <$> ident' reserved <*> (spaces *> varIdentBody' reserved)
-    , (flip Stx.VarIdent (Stx.BodySlot Stx.EmptyTail)) <$> ident' reserved
-    , try $ char '.' *> spaces *>
-      (Stx.DotVarIdent <$> ident' reserved <*> (spaces *> varIdentTail' reserved))
+    [ try $ fst <$> varIdentNonDotWithSlot' reserved trivialSlot
+    , flip Stx.VarIdent (Stx.BodySlot Stx.EmptyTail) <$> ident' reserved
+    , try $ char '.' *> spaces *> (fst <$> varIdentDotSuffixWithSlot' reserved trivialSlot)
     , try $ Stx.OperatorIdent <$> operatorIdent
     ]
 

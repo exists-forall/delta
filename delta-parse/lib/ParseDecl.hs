@@ -8,7 +8,7 @@ import ParseUtils
 import Data.Text (Text)
 
 import qualified Syntax as Stx
-import ParseIdent (ident, keyword, escapable, ident', typeIdent', typeVarIdent')
+import ParseIdent
 import ParsePat (typedPat)
 import ParseType (possibleFunc, possibleInters, type_)
 import ParseExpr (body)
@@ -34,38 +34,16 @@ extractType (Stx.PatTuple a b) = tupleBoth (extractType a) (extractType b)
 sigSlot :: Parser Stx.TypedPat
 sigSlot = char '(' *> spaces *> option Stx.PatUnit typedPat <* spaces <* char ')'
 
-sigTail :: Parser (Stx.VarIdentTail, [Stx.TypedPat])
-sigTail =
-  choice
-    [ first <$> (Stx.TailWord <$> ident) <*> (spaces *> sigTail)
-    , bimap Stx.TailSlot <$> ((:) <$> sigSlot) <*> (spaces *> sigTail)
-    , pure (Stx.EmptyTail, [])
-    ]
-
-sigBody :: Parser (Stx.VarIdentBody, [Stx.TypedPat])
-sigBody =
-  choice
-    [ first <$> (Stx.BodyWord <$> ident) <*> (spaces *> sigBody)
-    , bimap Stx.BodySlot <$> ((:) <$> sigSlot) <*> (spaces *> sigTail)
-    ]
-
-sigLhsNonDot :: Parser (Stx.VarIdent, [Stx.TypedPat])
-sigLhsNonDot =
-  first <$> (Stx.VarIdent <$> ident) <*> (spaces *> sigBody)
-
-sigPostDot :: Parser (Stx.VarIdent, [Stx.TypedPat])
-sigPostDot =
-  char '.' *> spaces *> (first <$> (Stx.DotVarIdent <$> ident) <*> (spaces *> sigTail))
-
 sigLhsDot :: Parser (Stx.VarIdent, [Stx.TypedPat])
 sigLhsDot =
-  second <$> ((:) <$> sigSlot) <*> (spaces *> sigPostDot)
+  second <$> ((:) <$> sigSlot) <*>
+    (spaces *> char '.' *> spaces *> varIdentDotSuffixWithSlot' ForbidReserved sigSlot)
 
 sigLhs :: Parser (Stx.VarIdent, (Stx.Pat, Stx.Type))
 sigLhs =
   second (foldr1 tupleBoth . map extractType) <$>
     choice
-      [ sigLhsNonDot
+      [ varIdentNonDotWithSlot' ForbidReserved sigSlot
       , sigLhsDot
       ]
 
