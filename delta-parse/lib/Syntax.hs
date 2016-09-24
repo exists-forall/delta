@@ -102,7 +102,7 @@ data Decl
 
 data Stub
   = StubDef VarIdent Type [Constraint]
-  | StubImplement TypeIdent Type [Constraint]
+  | StubImplement (Path TypeIdent) Type [Constraint]
   deriving (Eq, Ord, Show)
 
 -- For testing purposes:

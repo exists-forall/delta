@@ -529,7 +529,15 @@ test = describe "ParseDecl" $ do
         (DeclProtocol
           (simpleTIdent A)
           (simpleTypeVar T)
-          [StubImplement (simpleTIdent B) (simpleType C) []]
+          [StubImplement (Path [] $ simpleTIdent B) (simpleType C) []]
+        )
+
+    it "parses protocols with implement stubs with qualified names" $
+      parseDecl "protocol A < t > { implement B :: C < D > ; }" `shouldBe` Right
+        (DeclProtocol
+          (simpleTIdent A)
+          (simpleTypeVar T)
+          [StubImplement (Path [simpleModule B] $ simpleTIdent C) (simpleType D) []]
         )
 
     it "parses protocols with implement stubs with constraints" $
@@ -538,7 +546,7 @@ test = describe "ParseDecl" $ do
           (simpleTIdent A)
           (simpleTypeVar T)
           [StubImplement
-            (simpleTIdent B)
+            (Path [] $ simpleTIdent B)
             (simpleType C)
             [ConstraintImplement (Path [] $ simpleTIdent D) (simpleType E)]
           ]

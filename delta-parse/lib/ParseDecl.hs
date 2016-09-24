@@ -107,7 +107,7 @@ stubImplement :: Parser Stx.Stub
 stubImplement =
   keyword "implement" *> spaces *>
   (Stx.StubImplement
-    <$> (escapable typeIdent' <* spaces)
+    <$> ((Stx.Path <$> path <*> escapable typeIdent') <* spaces)
     <*> (char '<' *> spaces *> type_ <* spaces <* char '>' <* spaces)
     <*> (whereClause <* spaces)
   ) <* char ';'
