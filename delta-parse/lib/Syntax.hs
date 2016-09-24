@@ -3,7 +3,6 @@ module Syntax where
 import Text.Parsec (SourcePos)
 
 import Numeric.Natural (Natural)
-import Data.Bifunctor (bimap)
 
 {-
 This might seem like madness, but there is an exact one-to-one correspondence between valid Delta
@@ -89,17 +88,21 @@ data StructComponent
   | StructCase TypeIdent [StructComponent]
   deriving (Eq, Ord, Show)
 
+data Constraint
+  = ConstraintImplement (Path TypeIdent) (Type)
+  deriving (Eq, Ord, Show)
+
 data Decl
-  = DeclDef TypedPat Expr
+  = DeclDef TypedPat [Constraint] Expr
   | DeclTypeStruct TypeIdent [TypeVarIdent] [StructComponent]
   | DeclProtocol TypeIdent TypeVarIdent [Stub]
-  | DeclImplement (Path TypeIdent) Type [(TypedPat, Expr)]
+  | DeclImplement (Path TypeIdent) Type [Constraint] [(TypedPat, [Constraint], Expr)]
   | MarkDecl SourcePos Decl SourcePos
   deriving (Eq, Ord, Show)
 
 data Stub
-  = StubDef VarIdent Type
-  | StubImplement TypeIdent Type
+  = StubDef VarIdent Type [Constraint]
+  | StubImplement TypeIdent Type [Constraint]
   deriving (Eq, Ord, Show)
 
 -- For testing purposes:
@@ -126,8 +129,9 @@ stripMarks (Let pat e ret) = Let (stripPatMarks pat) (stripMarks e) (stripMarks 
 stripMarks (Mark _ e _) = stripMarks e
 
 stripDeclMarks :: Decl -> Decl
-stripDeclMarks (DeclDef p e) = DeclDef (stripPatMarks p) (stripMarks e)
+stripDeclMarks (DeclDef p c e) = DeclDef (stripPatMarks p) c (stripMarks e)
 stripDeclMarks (DeclTypeStruct t vs cs) = DeclTypeStruct t vs cs
 stripDeclMarks (DeclProtocol p t s) = DeclProtocol p t s
-stripDeclMarks (DeclImplement p t ds) = DeclImplement p t (map (bimap stripPatMarks stripMarks) ds)
+stripDeclMarks (DeclImplement p t c ds) =
+  DeclImplement p t c (map (\(pat, csts, expr) -> (stripPatMarks pat, csts, stripMarks expr)) ds)
 stripDeclMarks (MarkDecl _ d _) = stripDeclMarks d

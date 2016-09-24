@@ -31,7 +31,9 @@ extractType Stx.PatUnit = (Stx.PatUnit, Stx.TypeUnit)
 extractType (Stx.MarkPat pos1 p pos2) = first (flip (Stx.MarkPat pos1) pos2) (extractType p)
 extractType (Stx.PatTuple a b) = tupleBoth (extractType a) (extractType b)
 
-data Sig slot = Sig Stx.VarIdent [slot] Stx.Type Stx.Type
+data Sig slot = Sig Stx.VarIdent [slot] Stx.Type Stx.Type [Stx.Constraint]
+
+type Def = (Stx.TypedPat, [Stx.Constraint], Stx.Expr)
 
 sigArgs :: Parser slot -> Parser (Stx.VarIdent, [slot])
 sigArgs slot =
@@ -50,34 +52,52 @@ sigRetType :: Parser Stx.Type
 sigRetType =
   option Stx.TypeUnit $ string "->" *> spaces *> possibleFunc
 
+constraint :: Parser Stx.Constraint
+constraint =
+  Stx.ConstraintImplement
+    <$> (Stx.Path <$> path <*> escapable typeIdent')
+    <*> (spaces *> char '<' *> spaces *> type_ <* spaces <* char '>')
+
+whereClause :: Parser [Stx.Constraint]
+whereClause =
+  option [] $ keyword "where" *> spaces *> sepByTrailing (constraint <* spaces) (char ',' *> spaces)
+
 sig :: Parser slot -> Parser (Sig slot)
-sig slot = uncurry Sig <$> (sigArgs slot <* spaces) <*> (sigInterType <* spaces) <*> sigRetType
+sig slot =
+  uncurry Sig
+    <$> (sigArgs slot <* spaces)
+    <*> (sigInterType <* spaces)
+    <*> (sigRetType <* spaces)
+    <*> whereClause
 
 defSlot :: Parser Stx.TypedPat
 defSlot = char '(' *> spaces *> option Stx.PatUnit typedPat <* spaces <* char ')'
 
-assembleDef :: Sig Stx.TypedPat -> Stx.Expr -> (Stx.TypedPat, Stx.Expr)
-assembleDef (Sig name args interType retType) bodyExpr =
+assembleDef :: Sig Stx.TypedPat -> Stx.Expr -> Def
+assembleDef (Sig name args interType retType constraints) bodyExpr =
   let
     (argPat, argType) = foldr1 tupleBoth $ map extractType args
     funcType = Stx.TypeFunc argType interType retType
   in
-    (Stx.PatVar name funcType, Stx.Func argPat bodyExpr)
+    (Stx.PatVar name funcType, constraints, Stx.Func argPat bodyExpr)
 
-def :: Parser (Stx.TypedPat, Stx.Expr)
+def :: Parser Def
 def =
   keyword "def" *> spaces *>
     (assembleDef <$> sig defSlot <*> (spaces *> char '{' *> spaces *> body <* spaces <* char '}'))
 
+defToDecl :: Def -> Stx.Decl
+defToDecl (pat, constraints, expr) = Stx.DeclDef pat constraints expr
+
 defDecl :: Parser Stx.Decl
-defDecl = markDecl $ uncurry Stx.DeclDef <$> def
+defDecl = markDecl $ defToDecl <$> def
 
 stubDefSlot :: Parser Stx.Type
 stubDefSlot = char '(' *> spaces *> option Stx.TypeUnit type_ <* spaces <* char ')'
 
 assembleStubDef :: Sig Stx.Type -> Stx.Stub
-assembleStubDef (Sig name argType interType retType) =
-  Stx.StubDef name $ Stx.TypeFunc (foldr1 Stx.TypeTuple argType) interType retType
+assembleStubDef (Sig name argType interType retType constraints) =
+  Stx.StubDef name (Stx.TypeFunc (foldr1 Stx.TypeTuple argType) interType retType) constraints
 
 stubDef :: Parser Stx.Stub
 stubDef =
@@ -88,8 +108,9 @@ stubImplement =
   keyword "implement" *> spaces *>
   (Stx.StubImplement
     <$> (escapable typeIdent' <* spaces)
-    <*> (char '<' *> spaces *> type_ <* spaces <* char '>')
-  ) <* spaces <* char ';'
+    <*> (char '<' *> spaces *> type_ <* spaces <* char '>' <* spaces)
+    <*> (whereClause <* spaces)
+  ) <* char ';'
 
 stub :: Parser Stx.Stub
 stub =
@@ -112,6 +133,7 @@ implement =
   Stx.DeclImplement
     <$> (keyword "implement" *> spaces *> (Stx.Path <$> path <*> escapable typeIdent') <* spaces)
     <*> (char '<' *> spaces *> type_ <* spaces <* char '>' <* spaces)
+    <*> (whereClause <* spaces)
     <*> (char '{' *> spaces *> many (def <* spaces) <* char '}')
 
 caseBody :: Parser [Stx.StructComponent]

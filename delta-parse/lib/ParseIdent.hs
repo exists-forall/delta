@@ -39,6 +39,7 @@ reservedWord =
     , "case"
     , "protocol"
     , "implement"
+    , "where"
     ]
 
 data CheckReserved = AllowReserved | ForbidReserved

@@ -69,7 +69,7 @@ test = describe "ParseDecl" $ do
 
       it "parses minimal defs" $
         parseDecl "def f ( ) { }" `shouldBe` Right
-          (DeclDef (PatVar f (TypeFunc TypeUnit TypePure TypeUnit)) (Func PatUnit Unit))
+          (DeclDef (PatVar f (TypeFunc TypeUnit TypePure TypeUnit)) [] (Func PatUnit Unit))
 
       it "rejects defs with no slots" $
         parseDecl "def f { }" `shouldSatisfy` isLeft
@@ -80,7 +80,7 @@ test = describe "ParseDecl" $ do
       it "parses defs with non-empty slots" $
         parseDecl "def f ( x : A ) { }" `shouldBe` Right
           (DeclDef
-            (PatVar f (TypeFunc (simpleType A) TypePure TypeUnit))
+            (PatVar f (TypeFunc (simpleType A) TypePure TypeUnit)) []
             (Func (simplePatVar X) Unit)
           )
 
@@ -90,42 +90,42 @@ test = describe "ParseDecl" $ do
       it "parses defs with tuple patterns in a single slot" $
         parseDecl "def f ( x : A , y : B ) { }" `shouldBe` Right
           (DeclDef
-            (PatVar f (TypeFunc (TypeTuple (simpleType A) (simpleType B)) TypePure TypeUnit))
+            (PatVar f (TypeFunc (TypeTuple (simpleType A) (simpleType B)) TypePure TypeUnit)) []
             (Func (PatTuple (simplePatVar X) (simplePatVar Y)) Unit)
           )
 
       it "parses defs with multiple non-empty slots" $
         parseDecl "def g ( x : A ) ( y : B ) { }" `shouldBe` Right
           (DeclDef
-            (PatVar g (TypeFunc (TypeTuple (simpleType A) (simpleType B)) TypePure TypeUnit))
+            (PatVar g (TypeFunc (TypeTuple (simpleType A) (simpleType B)) TypePure TypeUnit)) []
             (Func (PatTuple (simplePatVar X) (simplePatVar Y)) Unit)
           )
 
       it "parses defs with words and slots interleaved" $
         parseDecl "def h ( x : A ) i ( y : B ) { }" `shouldBe` Right
           (DeclDef
-            (PatVar h (TypeFunc (TypeTuple (simpleType A) (simpleType B)) TypePure TypeUnit))
+            (PatVar h (TypeFunc (TypeTuple (simpleType A) (simpleType B)) TypePure TypeUnit)) []
             (Func (PatTuple (simplePatVar X) (simplePatVar Y)) Unit)
           )
 
       it "parses defs with consecutive words" $
         parseDecl "def i j ( ) { }" `shouldBe` Right
           (DeclDef
-            (PatVar i (TypeFunc TypeUnit TypePure TypeUnit))
+            (PatVar i (TypeFunc TypeUnit TypePure TypeUnit)) []
             (Func PatUnit Unit)
           )
 
       it "parses defs with non-empty interactions" $
         parseDecl "def f ( ) ! A | B { }" `shouldBe` Right
           (DeclDef
-            (PatVar f (TypeFunc TypeUnit (TypeInters (simpleType A) (simpleType B)) TypeUnit))
+            (PatVar f (TypeFunc TypeUnit (TypeInters (simpleType A) (simpleType B)) TypeUnit)) []
             (Func PatUnit Unit)
           )
 
       it "parses defs with non-empty return types" $
         parseDecl "def f ( ) -> A { }" `shouldBe` Right
           (DeclDef
-            (PatVar f (TypeFunc TypeUnit TypePure (simpleType A)))
+            (PatVar f (TypeFunc TypeUnit TypePure (simpleType A))) []
             (Func PatUnit Unit)
           )
 
@@ -135,7 +135,7 @@ test = describe "ParseDecl" $ do
       it "parses defs with parenthesized tuples as return types" $
         parseDecl "def f ( ) -> ( A , B ) { }" `shouldBe` Right
           (DeclDef
-            (PatVar f (TypeFunc TypeUnit TypePure (TypeTuple (simpleType A) (simpleType B))))
+            (PatVar f (TypeFunc TypeUnit TypePure (TypeTuple (simpleType A) (simpleType B)))) []
             (Func PatUnit Unit)
           )
 
@@ -150,6 +150,7 @@ test = describe "ParseDecl" $ do
                 (TypeFunc (simpleType A) TypePure (simpleType B))
               )
             )
+            []
             (Func PatUnit Unit)
           )
 
@@ -164,21 +165,66 @@ test = describe "ParseDecl" $ do
                 (simpleType D)
               )
             )
+            []
             (Func (simplePatVar X) Unit)
           )
 
       it "parses defs with non-empty bodies" $
         parseDecl "def f ( x : A ) { x }" `shouldBe` Right
           (DeclDef
-            (PatVar f (TypeFunc (simpleType A) TypePure TypeUnit))
+            (PatVar f (TypeFunc (simpleType A) TypePure TypeUnit)) []
             (Func (simplePatVar X) (simpleVarExpr X))
           )
 
       it "parses defs whose bodies have multiple statements" $
         parseDecl "def f ( x : A ) { y = x ; y }" `shouldBe` Right
           (DeclDef
-            (PatVar f (TypeFunc (simpleType A) TypePure TypeUnit))
+            (PatVar f (TypeFunc (simpleType A) TypePure TypeUnit)) []
             (Func (simplePatVar X) (Let (simplePatVar Y) (simpleVarExpr X) (simpleVarExpr Y)))
+          )
+
+      it "parses defs with constraints" $
+        parseDecl "def f ( ) where A < B > { }" `shouldBe` Right
+          (DeclDef
+            (PatVar f (TypeFunc TypeUnit TypePure TypeUnit))
+            [ConstraintImplement (Path [] $ simpleTIdent A) (simpleType B)]
+            (Func PatUnit Unit)
+          )
+
+      it "parses defs with multiple constraints" $
+        parseDecl "def f ( ) where A < B > , C < D > { }" `shouldBe` Right
+          (DeclDef
+            (PatVar f (TypeFunc TypeUnit TypePure TypeUnit))
+            [ ConstraintImplement (Path [] $ simpleTIdent A) (simpleType B)
+            , ConstraintImplement (Path [] $ simpleTIdent C) (simpleType D)
+            ]
+            (Func PatUnit Unit)
+          )
+
+      it "parses defs with multiple constraints with a trailing comma" $
+        parseDecl "def f ( ) where A < B > , C < D > , { }" `shouldBe` Right
+          (DeclDef
+            (PatVar f (TypeFunc TypeUnit TypePure TypeUnit))
+            [ ConstraintImplement (Path [] $ simpleTIdent A) (simpleType B)
+            , ConstraintImplement (Path [] $ simpleTIdent C) (simpleType D)
+            ]
+            (Func PatUnit Unit)
+          )
+
+      it "parses defs with constraints with qualified names" $
+        parseDecl "def f ( ) where A :: B < C > { }" `shouldBe` Right
+          (DeclDef
+            (PatVar f (TypeFunc TypeUnit TypePure TypeUnit))
+            [ConstraintImplement (Path [simpleModule A] $ simpleTIdent B) (simpleType C)]
+            (Func PatUnit Unit)
+          )
+
+      it "parses defs with constraints with escaped names" $
+        parseDecl "def f ( ) where ` Pure ` < A > { }" `shouldBe` Right
+          (DeclDef
+            (PatVar f (TypeFunc TypeUnit TypePure TypeUnit))
+            [ConstraintImplement (Path [] $ typeIdentPure) (simpleType A)]
+            (Func PatUnit Unit)
           )
 
     describe "dot-notation defs" $ do
@@ -209,7 +255,7 @@ test = describe "ParseDecl" $ do
       it "parses minimal defs" $
         parseDecl "def ( ) . f { }" `shouldBe` Right
           (DeclDef
-            (PatVar f (TypeFunc TypeUnit TypePure TypeUnit))
+            (PatVar f (TypeFunc TypeUnit TypePure TypeUnit)) []
             (Func PatUnit Unit)
           )
 
@@ -219,14 +265,14 @@ test = describe "ParseDecl" $ do
       it "parses defs with non-empty receiver patterns" $
         parseDecl "def ( x : A ) . f { }" `shouldBe` Right
           (DeclDef
-            (PatVar f (TypeFunc (simpleType A) TypePure TypeUnit))
+            (PatVar f (TypeFunc (simpleType A) TypePure TypeUnit)) []
             (Func (simplePatVar X) Unit)
           )
 
       it "parses defs with non-receiver slots" $
         parseDecl "def ( ) . g ( ) { }" `shouldBe` Right
           (DeclDef
-            (PatVar g (TypeFunc (TypeTuple TypeUnit TypeUnit) TypePure TypeUnit))
+            (PatVar g (TypeFunc (TypeTuple TypeUnit TypeUnit) TypePure TypeUnit)) []
             (Func (PatTuple PatUnit PatUnit) Unit)
           )
 
@@ -241,13 +287,14 @@ test = describe "ParseDecl" $ do
                 TypeUnit
               )
             )
+            []
             (Func (PatTuple (simplePatVar X) $ PatTuple (simplePatVar Y) (simplePatVar Z)) Unit)
           )
 
       it "parses defs with non-empty receiver and non-receiver slots" $
         parseDecl "def ( x : A ) . g ( y : B ) { }" `shouldBe` Right
           (DeclDef
-            (PatVar g (TypeFunc (TypeTuple (simpleType A) (simpleType B)) TypePure TypeUnit))
+            (PatVar g (TypeFunc (TypeTuple (simpleType A) (simpleType B)) TypePure TypeUnit)) []
             (Func (PatTuple (simplePatVar X) (simplePatVar Y)) Unit)
           )
 
@@ -262,27 +309,36 @@ test = describe "ParseDecl" $ do
                 TypeUnit
               )
             )
+            []
             (Func (PatTuple PatUnit $ PatTuple PatUnit PatUnit) Unit)
           )
 
       it "parses defs with consecutive words" $
         parseDecl "def ( ) . j k ( ) { }" `shouldBe` Right
           (DeclDef
-            (PatVar j (TypeFunc (TypeTuple TypeUnit TypeUnit) TypePure TypeUnit))
+            (PatVar j (TypeFunc (TypeTuple TypeUnit TypeUnit) TypePure TypeUnit)) []
             (Func (PatTuple PatUnit PatUnit) Unit)
           )
 
       it "parses defs with non-empty interactions" $
         parseDecl "def ( ) . f ! A | B { }" `shouldBe` Right
           (DeclDef
-            (PatVar f (TypeFunc TypeUnit (TypeInters (simpleType A) (simpleType B)) TypeUnit))
+            (PatVar f (TypeFunc TypeUnit (TypeInters (simpleType A) (simpleType B)) TypeUnit)) []
             (Func PatUnit Unit)
           )
 
       it "parses defs with non-empty return types" $
         parseDecl "def ( ) . f -> A { }" `shouldBe` Right
           (DeclDef
-            (PatVar f (TypeFunc TypeUnit TypePure (simpleType A)))
+            (PatVar f (TypeFunc TypeUnit TypePure (simpleType A))) []
+            (Func PatUnit Unit)
+          )
+
+      it "parses defs with constraints" $
+        parseDecl "def ( ) . f where A < B > { }" `shouldBe` Right
+          (DeclDef
+            (PatVar f (TypeFunc TypeUnit TypePure TypeUnit))
+            [ConstraintImplement (Path [] $ simpleTIdent A) (simpleType B)]
             (Func PatUnit Unit)
           )
 
@@ -413,7 +469,7 @@ test = describe "ParseDecl" $ do
         (DeclProtocol
           (simpleTIdent A)
           (simpleTypeVar T)
-          [StubDef (simpleVar F) (TypeFunc TypeUnit TypePure TypeUnit)]
+          [StubDef (simpleVar F) (TypeFunc TypeUnit TypePure TypeUnit) []]
         )
 
     it "parses protocols with nontrivial def stubs" $
@@ -423,7 +479,7 @@ test = describe "ParseDecl" $ do
           (simpleTypeVar T)
           [StubDef
             (VarIdent (simpleIdent F) $ BodySlot $ TailWord (simpleIdent G) $ TailSlot $ EmptyTail)
-            (TypeFunc (TypeTuple (simpleType A) (simpleType B)) (simpleType C) (simpleType D))
+            (TypeFunc (TypeTuple (simpleType A) (simpleType B)) (simpleType C) (simpleType D)) []
           ]
         )
 
@@ -432,7 +488,7 @@ test = describe "ParseDecl" $ do
         (DeclProtocol
           (simpleTIdent A)
           (simpleTypeVar T)
-          [StubDef (DotVarIdent (simpleIdent F) $ EmptyTail) (TypeFunc TypeUnit TypePure TypeUnit)]
+          [StubDef (DotVarIdent (simpleIdent F) $ EmptyTail) (TypeFunc TypeUnit TypePure TypeUnit) []]
         )
 
     it "parses protocols with nontrivial dot-notation def stubs" $
@@ -452,6 +508,19 @@ test = describe "ParseDecl" $ do
               (simpleType D)
               (simpleType E)
             )
+            []
+          ]
+        )
+
+    it "parses protocols with def stubs with constraints" $
+      parseDecl "protocol A < t > { def f ( ) where A < B > ; }" `shouldBe` Right
+        (DeclProtocol
+          (simpleTIdent A)
+          (simpleTypeVar T)
+          [StubDef
+            (simpleVar F)
+            (TypeFunc TypeUnit TypePure TypeUnit)
+            [ConstraintImplement (Path [] $ simpleTIdent A) (simpleType B)]
           ]
         )
 
@@ -460,7 +529,19 @@ test = describe "ParseDecl" $ do
         (DeclProtocol
           (simpleTIdent A)
           (simpleTypeVar T)
-          [StubImplement (simpleTIdent B) (simpleType C)]
+          [StubImplement (simpleTIdent B) (simpleType C) []]
+        )
+
+    it "parses protocols with implement stubs with constraints" $
+      parseDecl "protocol A < t > { implement B < C > where D < E > ; }" `shouldBe` Right
+        (DeclProtocol
+          (simpleTIdent A)
+          (simpleTypeVar T)
+          [StubImplement
+            (simpleTIdent B)
+            (simpleType C)
+            [ConstraintImplement (Path [] $ simpleTIdent D) (simpleType E)]
+          ]
         )
 
     it "parses protocols with multiple stubs" $
@@ -468,27 +549,36 @@ test = describe "ParseDecl" $ do
         (DeclProtocol
           (simpleTIdent A)
           (simpleTypeVar T)
-          [ StubDef (simpleVar F) (TypeFunc TypeUnit TypePure TypeUnit)
-          , StubDef (simpleVar G) (TypeFunc TypeUnit TypePure TypeUnit)
+          [ StubDef (simpleVar F) (TypeFunc TypeUnit TypePure TypeUnit) []
+          , StubDef (simpleVar G) (TypeFunc TypeUnit TypePure TypeUnit) []
           ]
         )
 
   describe "protocol implementations" $ do
     it "parses minimal implementations" $
       parseDecl "implement A < B > { }" `shouldBe` Right
-        (DeclImplement (Path [] $ simpleTIdent A) (simpleType B) [])
+        (DeclImplement (Path [] $ simpleTIdent A) (simpleType B) [] [])
 
     it "parses implementations with qualified names" $
       parseDecl "implement A :: B < C > { }" `shouldBe` Right
-        (DeclImplement (Path [simpleModule A] $ simpleTIdent B) (simpleType C) [])
+        (DeclImplement (Path [simpleModule A] $ simpleTIdent B) (simpleType C) [] [])
 
     it "parses implementations with escaped names" $
       parseDecl "implement ` Pure ` < A > { }" `shouldBe` Right
-        (DeclImplement (Path [] $ typeIdentPure) (simpleType A) [])
+        (DeclImplement (Path [] $ typeIdentPure) (simpleType A) [] [])
 
     it "parses implementations for nontrivial types" $
       parseDecl "implement A < B , C > { }" `shouldBe` Right
-        (DeclImplement (Path [] $ simpleTIdent A) (TypeTuple (simpleType B) (simpleType C)) [])
+        (DeclImplement (Path [] $ simpleTIdent A) (TypeTuple (simpleType B) (simpleType C)) [] [])
+
+    it "parses implementations with constraints" $
+      parseDecl "implement A < B > where C < D > { }" `shouldBe` Right
+        (DeclImplement
+          (Path [] $ simpleTIdent A)
+          (simpleType B)
+          [ConstraintImplement (Path [] $ simpleTIdent C) (simpleType D)]
+          []
+        )
 
     -- defs in implementations are implemented with the same logic as ordinary defs, so it's not
     -- crucial to test them as thoroughly as top-level def declarations.
@@ -497,8 +587,8 @@ test = describe "ParseDecl" $ do
       parseDecl "implement A < B > { def f ( ) { } }" `shouldBe` Right
         (DeclImplement
           (Path [] $ simpleTIdent A)
-          (simpleType B)
-          [ ( PatVar (simpleVar F) (TypeFunc TypeUnit TypePure TypeUnit)
+          (simpleType B) []
+          [ ( PatVar (simpleVar F) (TypeFunc TypeUnit TypePure TypeUnit), []
             , Func PatUnit Unit
             )
           ]
@@ -508,10 +598,11 @@ test = describe "ParseDecl" $ do
       parseDecl "implement A < B > { def f ( x : A ) g ( y : B ) ! C -> D { } }" `shouldBe` Right
         (DeclImplement
           (Path [] $ simpleTIdent A)
-          (simpleType B)
+          (simpleType B) []
           [ ( PatVar
               (VarIdent (simpleIdent F) $ BodySlot $ TailWord (simpleIdent G) $ TailSlot $ EmptyTail)
               (TypeFunc (TypeTuple (simpleType A) (simpleType B)) (simpleType C) (simpleType D))
+            , []
             , Func (PatTuple (simplePatVar X) (simplePatVar Y)) Unit
             )
           ]
@@ -521,8 +612,8 @@ test = describe "ParseDecl" $ do
       parseDecl "implement A < B > { def ( ) . f { } }" `shouldBe` Right
         (DeclImplement
           (Path [] $ simpleTIdent A)
-          (simpleType B)
-          [ ( PatVar (DotVarIdent (simpleIdent F) $ EmptyTail) (TypeFunc TypeUnit TypePure TypeUnit)
+          (simpleType B) []
+          [ ( PatVar (DotVarIdent (simpleIdent F) $ EmptyTail) (TypeFunc TypeUnit TypePure TypeUnit), []
             , Func PatUnit Unit
             )
           ]
@@ -532,7 +623,7 @@ test = describe "ParseDecl" $ do
       parseDecl "implement A < B > { def ( x : A ) . f ( y : B ) g ( z : C ) ! D -> E { } }" `shouldBe` Right
           (DeclImplement
             (Path [] $ simpleTIdent A)
-            (simpleType B)
+            (simpleType B) []
             [ ( PatVar
                 ( DotVarIdent (simpleIdent F)
                 $ TailSlot
@@ -545,6 +636,7 @@ test = describe "ParseDecl" $ do
                   (simpleType D)
                   (simpleType E)
                 )
+              , []
               , Func (PatTuple (simplePatVar X) $ PatTuple (simplePatVar Y) (simplePatVar Z)) Unit
               )
             ]
@@ -554,9 +646,22 @@ test = describe "ParseDecl" $ do
       parseDecl "implement A < B > { def f ( x : C ) -> C { x } }" `shouldBe` Right
         (DeclImplement
           (Path [] $ simpleTIdent A)
-          (simpleType B)
-          [ ( PatVar (simpleVar F) (TypeFunc (simpleType C) TypePure (simpleType C))
+          (simpleType B) []
+          [ ( PatVar (simpleVar F) (TypeFunc (simpleType C) TypePure (simpleType C)), []
             , (Func (simplePatVar X) (simpleVarExpr X))
+            )
+          ]
+        )
+
+    it "parses implementations with defs with constraints" $
+      parseDecl "implement A < B > { def f ( ) where C < D > { } }" `shouldBe` Right
+        (DeclImplement
+          (Path [] $ simpleTIdent A)
+          (simpleType B)
+          []
+          [ ( PatVar (simpleVar F) (TypeFunc TypeUnit TypePure TypeUnit)
+            , [ConstraintImplement (Path [] $ simpleTIdent C) (simpleType D)]
+            , Func PatUnit Unit
             )
           ]
         )
@@ -565,11 +670,11 @@ test = describe "ParseDecl" $ do
       parseDecl "implement A < B > { def f ( ) { } def g ( ) { } }" `shouldBe` Right
         (DeclImplement
           (Path [] $ simpleTIdent A)
-          (simpleType B)
-          [ ( PatVar (simpleVar F) (TypeFunc TypeUnit TypePure TypeUnit)
+          (simpleType B) []
+          [ ( PatVar (simpleVar F) (TypeFunc TypeUnit TypePure TypeUnit), []
             , Func PatUnit Unit
             )
-          , ( PatVar (simpleVar G) (TypeFunc TypeUnit TypePure TypeUnit)
+          , ( PatVar (simpleVar G) (TypeFunc TypeUnit TypePure TypeUnit), []
             , Func PatUnit Unit
             )
           ]
