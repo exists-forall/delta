@@ -56,19 +56,21 @@ sig slot = uncurry Sig <$> (sigArgs slot <* spaces) <*> (sigInterType <* spaces)
 defSlot :: Parser Stx.TypedPat
 defSlot = char '(' *> spaces *> option Stx.PatUnit typedPat <* spaces <* char ')'
 
-assembleDef :: Sig Stx.TypedPat -> Stx.Expr -> Stx.Decl
+assembleDef :: Sig Stx.TypedPat -> Stx.Expr -> (Stx.TypedPat, Stx.Expr)
 assembleDef (Sig name args interType retType) bodyExpr =
   let
     (argPat, argType) = foldr1 tupleBoth $ map extractType args
     funcType = Stx.TypeFunc argType interType retType
   in
-    Stx.DeclDef (Stx.PatVar name funcType) (Stx.Func argPat bodyExpr)
+    (Stx.PatVar name funcType, Stx.Func argPat bodyExpr)
 
-def :: Parser Stx.Decl
+def :: Parser (Stx.TypedPat, Stx.Expr)
 def =
-  markDecl $
   keyword "def" *> spaces *>
     (assembleDef <$> sig defSlot <*> (spaces *> char '{' *> spaces *> body <* spaces <* char '}'))
+
+defDecl :: Parser Stx.Decl
+defDecl = markDecl $ uncurry Stx.DeclDef <$> def
 
 stubDefSlot :: Parser Stx.Type
 stubDefSlot = char '(' *> spaces *> option Stx.TypeUnit type_ <* spaces <* char ')'
@@ -104,6 +106,14 @@ protocol =
     <*> (char '<' *> spaces *> escapable typeVarIdent' <* spaces <* char '>' <* spaces)
     <*> (char '{' *> spaces *> many (stub <* spaces) <* char '}')
 
+implement :: Parser Stx.Decl
+implement =
+  markDecl $
+  Stx.DeclImplement
+    <$> (keyword "implement" *> spaces *> (Stx.Path <$> path <*> escapable typeIdent') <* spaces)
+    <*> (char '<' *> spaces *> type_ <* spaces <* char '>' <* spaces)
+    <*> (char '{' *> spaces *> many (def <* spaces) <* char '}')
+
 caseBody :: Parser [Stx.StructComponent]
 caseBody =
   (char ';' *> pure []) <|> structBody
@@ -136,7 +146,8 @@ typeStruct =
 decl :: Parser Stx.Decl
 decl =
   choice
-    [ def
+    [ defDecl
     , typeStruct
     , protocol
+    , implement
     ]

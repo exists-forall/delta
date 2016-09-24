@@ -3,6 +3,7 @@ module Syntax where
 import Text.Parsec (SourcePos)
 
 import Numeric.Natural (Natural)
+import Data.Bifunctor (bimap)
 
 {-
 This might seem like madness, but there is an exact one-to-one correspondence between valid Delta
@@ -92,6 +93,7 @@ data Decl
   = DeclDef TypedPat Expr
   | DeclTypeStruct TypeIdent [TypeVarIdent] [StructComponent]
   | DeclProtocol TypeIdent TypeVarIdent [Stub]
+  | DeclImplement (Path TypeIdent) Type [(TypedPat, Expr)]
   | MarkDecl SourcePos Decl SourcePos
   deriving (Eq, Ord, Show)
 
@@ -127,4 +129,5 @@ stripDeclMarks :: Decl -> Decl
 stripDeclMarks (DeclDef p e) = DeclDef (stripPatMarks p) (stripMarks e)
 stripDeclMarks (DeclTypeStruct t vs cs) = DeclTypeStruct t vs cs
 stripDeclMarks (DeclProtocol p t s) = DeclProtocol p t s
+stripDeclMarks (DeclImplement p t ds) = DeclImplement p t (map (bimap stripPatMarks stripMarks) ds)
 stripDeclMarks (MarkDecl _ d _) = stripDeclMarks d

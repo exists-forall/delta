@@ -36,6 +36,9 @@ simpleTypeVar l = TypeVarIdent l []
 simpleType :: Letter -> Type
 simpleType l = TypeAtom $ Path [] $ simpleTIdent l
 
+simpleModule :: Letter -> ModuleIdent
+simpleModule l = ModuleIdent l []
+
 test :: Spec
 test = describe "ParseDecl" $ do
   let typeIdentPure = TypeIdent P $ map (StartChar . Alpha LowerCase) [U, R, E]
@@ -467,5 +470,107 @@ test = describe "ParseDecl" $ do
           (simpleTypeVar T)
           [ StubDef (simpleVar F) (TypeFunc TypeUnit TypePure TypeUnit)
           , StubDef (simpleVar G) (TypeFunc TypeUnit TypePure TypeUnit)
+          ]
+        )
+
+  describe "protocol implementations" $ do
+    it "parses minimal implementations" $
+      parseDecl "implement A < B > { }" `shouldBe` Right
+        (DeclImplement (Path [] $ simpleTIdent A) (simpleType B) [])
+
+    it "parses implementations with qualified names" $
+      parseDecl "implement A :: B < C > { }" `shouldBe` Right
+        (DeclImplement (Path [simpleModule A] $ simpleTIdent B) (simpleType C) [])
+
+    it "parses implementations with escaped names" $
+      parseDecl "implement ` Pure ` < A > { }" `shouldBe` Right
+        (DeclImplement (Path [] $ typeIdentPure) (simpleType A) [])
+
+    it "parses implementations for nontrivial types" $
+      parseDecl "implement A < B , C > { }" `shouldBe` Right
+        (DeclImplement (Path [] $ simpleTIdent A) (TypeTuple (simpleType B) (simpleType C)) [])
+
+    -- defs in implementations are implemented with the same logic as ordinary defs, so it's not
+    -- crucial to test them as thoroughly as top-level def declarations.
+
+    it "parses implementations with minimal defs" $
+      parseDecl "implement A < B > { def f ( ) { } }" `shouldBe` Right
+        (DeclImplement
+          (Path [] $ simpleTIdent A)
+          (simpleType B)
+          [ ( PatVar (simpleVar F) (TypeFunc TypeUnit TypePure TypeUnit)
+            , Func PatUnit Unit
+            )
+          ]
+        )
+
+    it "parses implementations with nontrivial def signatures" $
+      parseDecl "implement A < B > { def f ( x : A ) g ( y : B ) ! C -> D { } }" `shouldBe` Right
+        (DeclImplement
+          (Path [] $ simpleTIdent A)
+          (simpleType B)
+          [ ( PatVar
+              (VarIdent (simpleIdent F) $ BodySlot $ TailWord (simpleIdent G) $ TailSlot $ EmptyTail)
+              (TypeFunc (TypeTuple (simpleType A) (simpleType B)) (simpleType C) (simpleType D))
+            , Func (PatTuple (simplePatVar X) (simplePatVar Y)) Unit
+            )
+          ]
+        )
+
+    it "parses implementations with minimal dot-notation defs" $
+      parseDecl "implement A < B > { def ( ) . f { } }" `shouldBe` Right
+        (DeclImplement
+          (Path [] $ simpleTIdent A)
+          (simpleType B)
+          [ ( PatVar (DotVarIdent (simpleIdent F) $ EmptyTail) (TypeFunc TypeUnit TypePure TypeUnit)
+            , Func PatUnit Unit
+            )
+          ]
+        )
+
+    it "parses implementations with nontrivial dot-notation def stubs" $
+      parseDecl "implement A < B > { def ( x : A ) . f ( y : B ) g ( z : C ) ! D -> E { } }" `shouldBe` Right
+          (DeclImplement
+            (Path [] $ simpleTIdent A)
+            (simpleType B)
+            [ ( PatVar
+                ( DotVarIdent (simpleIdent F)
+                $ TailSlot
+                $ TailWord (simpleIdent G)
+                $ TailSlot
+                $ EmptyTail
+                )
+                (TypeFunc
+                  (TypeTuple (simpleType A) $ TypeTuple (simpleType B) (simpleType C))
+                  (simpleType D)
+                  (simpleType E)
+                )
+              , Func (PatTuple (simplePatVar X) $ PatTuple (simplePatVar Y) (simplePatVar Z)) Unit
+              )
+            ]
+          )
+
+    it "parses implementations with defs with bodies" $
+      parseDecl "implement A < B > { def f ( x : C ) -> C { x } }" `shouldBe` Right
+        (DeclImplement
+          (Path [] $ simpleTIdent A)
+          (simpleType B)
+          [ ( PatVar (simpleVar F) (TypeFunc (simpleType C) TypePure (simpleType C))
+            , (Func (simplePatVar X) (simpleVarExpr X))
+            )
+          ]
+        )
+
+    it "parses implementations with multiple defs" $
+      parseDecl "implement A < B > { def f ( ) { } def g ( ) { } }" `shouldBe` Right
+        (DeclImplement
+          (Path [] $ simpleTIdent A)
+          (simpleType B)
+          [ ( PatVar (simpleVar F) (TypeFunc TypeUnit TypePure TypeUnit)
+            , Func PatUnit Unit
+            )
+          , ( PatVar (simpleVar G) (TypeFunc TypeUnit TypePure TypeUnit)
+            , Func PatUnit Unit
+            )
           ]
         )
