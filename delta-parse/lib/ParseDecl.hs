@@ -40,8 +40,11 @@ sigArgs slot =
   choice
     [ varIdentNonDotWithSlot' ForbidReserved slot
     , second
-      <$> ((:) <$> slot)
-      <*> (spaces *> char '.' *> spaces *> varIdentDotSuffixWithSlot' ForbidReserved slot)
+      <$> ((:) <$> slot <* spaces)
+      <*> choice
+        [ char '.' *> spaces *> varIdentDotSuffixWithSlot' ForbidReserved slot
+        , (,) <$> (Stx.OperatorIdent <$> operatorIdent <* spaces) <*> ((:[]) <$> slot)
+        ]
     ]
 
 sigInterType :: Parser Stx.Type

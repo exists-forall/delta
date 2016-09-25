@@ -342,6 +342,20 @@ test = describe "ParseDecl" $ do
             (Func PatUnit Unit)
           )
 
+    describe "operator-notation defs" $ do
+      it "parses operator-notation defs" $
+        -- Testing with '-', not some other operator, because it could theoretically conflict with
+        -- the '->' return type syntax.
+        parseDecl "def ( x : A ) - ( y : B ) ! C -> D { }" `shouldBe` Right
+          (DeclDef
+            (PatVar
+              (OperatorIdent OpSub)
+              (TypeFunc (TypeTuple (simpleType A) (simpleType B)) (simpleType C) (simpleType D))
+            )
+            []
+            (Func (PatTuple (simplePatVar X) (simplePatVar Y)) Unit)
+          )
+
     describe "non-function defs" $ do
       it "parses simple defs" $
         parseDecl "x : A = y ;" `shouldBe` Right
@@ -538,6 +552,17 @@ test = describe "ParseDecl" $ do
           ]
         )
 
+    it "parses protocols with nontrivial operator-notation def stubs" $
+      parseDecl "protocol A < t > { def ( B ) - ( C ) ! D -> E ; }" `shouldBe` Right
+        (DeclProtocol
+          (simpleTIdent A)
+          (simpleTypeVar T)
+          [StubDef
+            (OperatorIdent OpSub)
+            (TypeFunc (TypeTuple (simpleType B) (simpleType C)) (simpleType D) (simpleType E)) []
+          ]
+        )
+
     it "parses protocols with def stubs with constraints" $
       parseDecl "protocol A < t > { def f ( ) where A < B > ; }" `shouldBe` Right
         (DeclProtocol
@@ -691,6 +716,20 @@ test = describe "ParseDecl" $ do
               )
             ]
           )
+
+    it "parses implementations with nontrivial operator-notation defs" $
+      parseDecl "implement A < B > { def ( x : C ) - ( y : D ) ! E -> F { } }" `shouldBe` Right
+        (DeclImplement
+          (Path [] $ simpleTIdent A)
+          (simpleType B) []
+          [ ( PatVar
+              (OperatorIdent OpSub)
+              (TypeFunc (TypeTuple (simpleType C) (simpleType D)) (simpleType E) (simpleType F))
+            , []
+            , Func (PatTuple (simplePatVar X) (simplePatVar Y)) Unit
+            )
+          ]
+        )
 
     it "parses implementations with non-function defs" $
       parseDecl "implement A < B > { x : C = y ; }" `shouldBe` Right
