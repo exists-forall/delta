@@ -342,6 +342,32 @@ test = describe "ParseDecl" $ do
             (Func PatUnit Unit)
           )
 
+    describe "non-function defs" $ do
+      it "parses simple defs" $
+        parseDecl "x : A = y ;" `shouldBe` Right
+          (DeclDef (PatVar (simpleVar X) (simpleType A)) [] (simpleVarExpr Y))
+
+      it "parses defs with nontrivial patterns" $
+        parseDecl "( ) , ( x : A , _ : B ) , y : C = z ;" `shouldBe` Right
+          (DeclDef
+            (PatTuple PatUnit
+            $ PatTuple (PatTuple (PatVar (simpleVar X) (simpleType A)) (PatIgnore (simpleType B)))
+            $ PatVar (simpleVar Y) (simpleType C)
+            )
+            []
+            (simpleVarExpr Z)
+          )
+
+      it "parses defs with constraints" $
+        parseDecl "x : A where B < C > , D < E > = y ;" `shouldBe` Right
+          (DeclDef
+            (PatVar (simpleVar X) (simpleType A))
+            [ ConstraintImplement (Path [] $ simpleTIdent B) (simpleType C)
+            , ConstraintImplement (Path [] $ simpleTIdent D) (simpleType E)
+            ]
+            (simpleVarExpr Y)
+          )
+
   describe "type structures" $ do
     it "parses minimal structs" $
       parseDecl "type A { }" `shouldBe` Right (DeclTypeStruct (simpleTIdent A) [] [])
@@ -524,6 +550,22 @@ test = describe "ParseDecl" $ do
           ]
         )
 
+    it "parses protocols with non-function def stubs" $
+      parseDecl "protocol A < t > { x : B ; }" `shouldBe` Right
+        (DeclProtocol (simpleTIdent A) (simpleTypeVar T) [StubDef (simpleVar X) (simpleType B) []])
+
+    it "parses protocols with non-function def stubs with constraints" $
+      parseDecl "protocol A < t > { x : B where C < D > ; }" `shouldBe` Right
+        (DeclProtocol
+          (simpleTIdent A)
+          (simpleTypeVar T)
+          [StubDef
+            (simpleVar X)
+            (simpleType B)
+            [ConstraintImplement (Path [] $ simpleTIdent C) (simpleType D)]
+          ]
+        )
+
     it "parses protocols with implement stubs" $
       parseDecl "protocol A < t > { implement B < C > ; }" `shouldBe` Right
         (DeclProtocol
@@ -627,7 +669,7 @@ test = describe "ParseDecl" $ do
           ]
         )
 
-    it "parses implementations with nontrivial dot-notation def stubs" $
+    it "parses implementations with nontrivial dot-notation def" $
       parseDecl "implement A < B > { def ( x : A ) . f ( y : B ) g ( z : C ) ! D -> E { } }" `shouldBe` Right
           (DeclImplement
             (Path [] $ simpleTIdent A)
@@ -649,6 +691,14 @@ test = describe "ParseDecl" $ do
               )
             ]
           )
+
+    it "parses implementations with non-function defs" $
+      parseDecl "implement A < B > { x : C = y ; }" `shouldBe` Right
+        (DeclImplement
+          (Path [] $ simpleTIdent A)
+          (simpleType B) []
+          [(PatVar (simpleVar X) (simpleType C), [], simpleVarExpr Y)]
+        )
 
     it "parses implementations with defs with bodies" $
       parseDecl "implement A < B > { def f ( x : C ) -> C { x } }" `shouldBe` Right

@@ -11,7 +11,7 @@ import qualified Syntax as Stx
 import ParseIdent
 import ParsePat (typedPat)
 import ParseType (possibleFunc, possibleInters, type_)
-import ParseExpr (body)
+import ParseExpr (body, expr)
 
 import Data.Bifunctor (first, second)
 
@@ -81,10 +81,24 @@ assembleDef (Sig name args interType retType constraints) bodyExpr =
   in
     (Stx.PatVar name funcType, constraints, Stx.Func argPat bodyExpr)
 
-def :: Parser Def
-def =
+funcDef :: Parser Def
+funcDef =
   keyword "def" *> spaces *>
     (assembleDef <$> sig defSlot <*> (spaces *> char '{' *> spaces *> body <* spaces <* char '}'))
+
+constDef :: Parser Def
+constDef =
+  (,,)
+    <$> (typedPat <* spaces)
+    <*> (whereClause <* spaces)
+    <*> (char '=' *> spaces *> expr <* spaces <* char ';')
+
+def :: Parser Def
+def =
+  choice
+    [ funcDef
+    , constDef
+    ]
 
 defToDecl :: Def -> Stx.Decl
 defToDecl (pat, constraints, expr) = Stx.DeclDef pat constraints expr
@@ -99,9 +113,17 @@ assembleStubDef :: Sig Stx.Type -> Stx.Stub
 assembleStubDef (Sig name argType interType retType constraints) =
   Stx.StubDef name (Stx.TypeFunc (foldr1 Stx.TypeTuple argType) interType retType) constraints
 
-stubDef :: Parser Stx.Stub
-stubDef =
+stubFuncDef :: Parser Stx.Stub
+stubFuncDef =
   keyword "def" *> spaces *> (assembleStubDef <$> sig stubDefSlot) <* spaces <* char ';'
+
+stubConstDef :: Parser Stx.Stub
+stubConstDef =
+  (Stx.StubDef
+    <$> (escapableIdent <* spaces)
+    <*> (char ':' *> spaces *> possibleFunc <* spaces)
+    <*> (whereClause <* spaces)
+  ) <* char ';'
 
 stubImplement :: Parser Stx.Stub
 stubImplement =
@@ -115,8 +137,9 @@ stubImplement =
 stub :: Parser Stx.Stub
 stub =
   choice
-    [ stubDef
+    [ stubFuncDef
     , stubImplement
+    , stubConstDef
     ]
 
 protocol :: Parser Stx.Decl
