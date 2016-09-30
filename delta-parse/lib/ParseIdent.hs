@@ -40,6 +40,8 @@ reservedWord =
     , "protocol"
     , "implement"
     , "where"
+    , "interaction"
+    , "message"
     ]
 
 data CheckReserved = AllowReserved | ForbidReserved

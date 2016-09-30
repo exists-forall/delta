@@ -191,6 +191,24 @@ typeStruct =
       <*> (many $ char '<' *> spaces *> escapable typeVarIdent' <* spaces <* char '>' <* spaces)
       <*> structBody)
 
+message :: Parser (Stx.Ident, Stx.Type, Stx.Type)
+message =
+  keyword "message" *> spaces *>
+    ((,,)
+      <$> (escapable ident' <* spaces)
+      <*> (char '(' *> spaces *> type_ <* spaces <* char ')' <* spaces)
+      <*> (string "->" *> spaces *> possibleFunc <* spaces)
+    ) <* char ';'
+
+interaction :: Parser Stx.Decl
+interaction =
+  keyword "interaction" *> spaces *>
+    (Stx.DeclInteraction
+      <$> (escapable typeIdent' <* spaces)
+      <*> many (char '<' *> spaces *> escapable typeVarIdent' <* spaces <* char '>' <* spaces)
+      <*> (char '{' *> spaces *> many (message <* spaces) <* spaces <* char '}')
+    )
+
 decl :: Parser Stx.Decl
 decl =
   choice
@@ -198,4 +216,5 @@ decl =
     , typeStruct
     , protocol
     , implement
+    , interaction
     ]

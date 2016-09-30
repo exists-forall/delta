@@ -776,3 +776,47 @@ test = describe "ParseDecl" $ do
             )
           ]
         )
+
+  describe "interactions" $ do
+    it "parses minimal interactions" $
+      parseDecl "interaction A { }" `shouldBe` Right (DeclInteraction (simpleTIdent A) [] [])
+
+    it "parses interactions with escaped names" $
+      parseDecl "interaction `Pure` { }" `shouldBe` Right (DeclInteraction typeIdentPure [] [])
+
+    it "parses interactions with type parameters" $
+      parseDecl "interaction A < x > < y > { }" `shouldBe` Right
+        (DeclInteraction (simpleTIdent A) [simpleTypeVar X, simpleTypeVar Y] [])
+
+    it "parses interactions with type parameters with escaped names" $
+      parseDecl "interaction A < ` do ` > { }" `shouldBe` Right
+        (DeclInteraction (simpleTIdent A) [typeVarDo] [])
+
+    it "parses interactions with messages" $
+      parseDecl "interaction A { message f ( B ) -> C ; }" `shouldBe` Right
+        (DeclInteraction (simpleTIdent A) [] [(simpleIdent F, simpleType B, simpleType C)])
+
+    it "parses interactions with messages with escaped names" $
+      parseDecl "interaction A { message ` do ` ( B ) -> C ; }" `shouldBe` Right
+        (DeclInteraction
+          (simpleTIdent A)
+          []
+          [(Ident (Alpha LowerCase D) [StartChar $ Alpha LowerCase O], simpleType B, simpleType C)]
+        )
+
+    it "rejects messages without explicit return types" $
+      parseDecl "interaction A { message f ( B ) ; }" `shouldSatisfy` isLeft
+
+    it "rejects messages which return unparenthesized tuples" $
+      parseDecl "interaction A { message f ( B ) -> C , D ; }" `shouldSatisfy` isLeft
+
+    it "rejects messages which make use of free-form function call syntax" $
+      parseDecl "interaction A { message f ( B ) g ( C ) -> D ; }" `shouldSatisfy` isLeft
+
+    it "parses interactions with multiple messages" $
+      parseDecl "interaction A { message f ( B ) -> C ; message g ( D ) -> E ; }" `shouldBe` Right
+        (DeclInteraction
+          (simpleTIdent A)
+          []
+          [(simpleIdent F, simpleType B, simpleType C), (simpleIdent G, simpleType D, simpleType E)]
+        )

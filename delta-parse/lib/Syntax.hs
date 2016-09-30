@@ -97,6 +97,7 @@ data Decl
   | DeclTypeStruct TypeIdent [TypeVarIdent] [StructComponent]
   | DeclProtocol TypeIdent TypeVarIdent [Stub]
   | DeclImplement (Path TypeIdent) Type [Constraint] [(TypedPat, [Constraint], Expr)]
+  | DeclInteraction TypeIdent [TypeVarIdent] [(Ident, Type, Type)]
   | MarkDecl SourcePos Decl SourcePos
   deriving (Eq, Ord, Show)
 
@@ -134,4 +135,5 @@ stripDeclMarks (DeclTypeStruct t vs cs) = DeclTypeStruct t vs cs
 stripDeclMarks (DeclProtocol p t s) = DeclProtocol p t s
 stripDeclMarks (DeclImplement p t c ds) =
   DeclImplement p t c (map (\(pat, csts, expr) -> (stripPatMarks pat, csts, stripMarks expr)) ds)
+stripDeclMarks (DeclInteraction i v m) = DeclInteraction i v m
 stripDeclMarks (MarkDecl _ d _) = stripDeclMarks d
