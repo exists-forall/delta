@@ -104,7 +104,7 @@ def =
     ]
 
 defToDecl :: Def -> Stx.Decl
-defToDecl (pat, constraints, expr) = Stx.DeclDef pat constraints expr
+defToDecl (pat, constraints, funcExpr) = Stx.DeclDef pat constraints funcExpr
 
 defDecl :: Parser Stx.Decl
 defDecl = markDecl $ defToDecl <$> def
