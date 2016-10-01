@@ -14,10 +14,10 @@ import ParseUtils
 import Data.Either (isLeft)
 
 parsePat :: Text -> Either ParseError Pat
-parsePat = fmap stripPatMarks . fullParse pat
+parsePat = fmap (stripPatMarks (fmap stripTypeMarks)) . fullParse pat
 
 parseTypedPat :: Text -> Either ParseError TypedPat
-parseTypedPat = fmap stripPatMarks . fullParse typedPat
+parseTypedPat = fmap (stripPatMarks stripTypeMarks) . fullParse typedPat
 
 simpleIdent :: Letter -> VarIdent
 simpleIdent l = VarIdent (Ident (Alpha LowerCase l) []) $ BodySlot EmptyTail
