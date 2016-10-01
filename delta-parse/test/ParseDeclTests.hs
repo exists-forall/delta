@@ -343,7 +343,7 @@ test = describe "ParseDecl" $ do
           )
 
     describe "operator-notation defs" $ do
-      it "parses operator-notation defs" $
+      it "parses binary-operator-notation defs" $
         -- Testing with '-', not some other operator, because it could theoretically conflict with
         -- the '->' return type syntax.
         parseDecl "def ( x : A ) - ( y : B ) ! C -> D { }" `shouldBe` Right
@@ -354,6 +354,17 @@ test = describe "ParseDecl" $ do
             )
             []
             (Func (PatTuple (simplePatVar X) (simplePatVar Y)) Unit)
+          )
+
+      it "parses prefix-operator-notation defs" $
+        parseDecl "def - ( x : A ) ! B -> C { }" `shouldBe` Right
+          (DeclDef
+            (PatVar
+              (PrefixOperatorIdent OpNegate)
+              (TypeFunc (simpleType A) (simpleType B) (simpleType C))
+            )
+            []
+            (Func (simplePatVar X) Unit)
           )
 
     describe "non-function defs" $ do

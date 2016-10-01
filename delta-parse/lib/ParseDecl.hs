@@ -39,6 +39,7 @@ sigArgs :: Parser slot -> Parser (Stx.VarIdent, [slot])
 sigArgs slot =
   choice
     [ varIdentNonDotWithSlot' ForbidReserved slot
+    , (,) <$> (Stx.PrefixOperatorIdent <$> prefixOperatorIdent <* spaces) <*> ((:[]) <$> slot)
     , second
       <$> ((:) <$> slot <* spaces)
       <*> choice

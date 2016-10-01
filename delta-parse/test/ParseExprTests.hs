@@ -111,8 +111,10 @@ test = describe "ParseExpr" $ do
       $ EmptyTail
 
     add = Var $ Path [] $ OperatorIdent OpAdd
+    sub = Var $ Path [] $ OperatorIdent OpSub
     mul = Var $ Path [] $ OperatorIdent OpMul
     equ = Var $ Path [] $ OperatorIdent OpEqu
+    neg = Var $ Path [] $ PrefixOperatorIdent OpNegate
     logicOr = Var $ Path [] $ OperatorIdent OpOr
 
     xPat = flip PatVar Nothing
@@ -143,6 +145,9 @@ test = describe "ParseExpr" $ do
 
     it "parses escaped binary operators" $
       parseExpr "` + `" `shouldBe` Right (Var (Path [] (OperatorIdent OpAdd)))
+
+    it "parses escaped prefix operators" $
+      parseExpr "` - ( ) `" `shouldBe` Right (Var (Path [] (PrefixOperatorIdent OpNegate)))
 
     it "parses unsigned integer literals" $
       parseExpr "42" `shouldBe` Right (LitUInt 42)
@@ -274,6 +279,21 @@ test = describe "ParseExpr" $ do
     it "parses right-associative binary operator calls" $
       parseExpr "1 || 2 || 3" `shouldBe` Right
         (Call logicOr (Tuple (LitUInt 1) (Call logicOr (Tuple (LitUInt 2) (LitUInt 3)))))
+
+    it "parses prefix operator calls" $
+      parseExpr "- 1 " `shouldBe` Right (Call neg (LitUInt 1))
+
+    it "parses chained prefix operator calls" $
+      parseExpr "- - 1" `shouldBe` Right (Call neg (Call neg (LitUInt 1)))
+
+    it "binds prefix operator calls more tightly than binary operator calls" $
+      parseExpr "- 1 + 2" `shouldBe` Right (Call add (Tuple (Call neg (LitUInt 1)) (LitUInt 2)))
+
+    it "parses mixed binary and prefix operators" $
+      parseExpr "1 - - 2" `shouldBe` Right (Call sub (Tuple (LitUInt 1) (Call neg (LitUInt 2))))
+
+    it "binds prefix operator calls less tightly than suffixes" $
+      parseExpr "- x . c ( M :: N :: y )" `shouldBe` Right (Call neg (Call c (Tuple x y)))
 
     it "rejects ambiguous binary operator calls" $
       parseExpr "f >> g << h" `shouldSatisfy` isLeft

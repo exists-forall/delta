@@ -173,6 +173,16 @@ suffixes =
     <*> (atomicExpr <* spaces)
     <*> many (markedSuffix <* spaces)
 
+prefixes :: Parser Stx.Expr
+prefixes =
+  choice
+    [ mark $
+      Stx.Call
+        <$> ((Stx.Var . Stx.Path [] . Stx.PrefixOperatorIdent) <$> prefixOperatorIdent <* spaces)
+        <*> prefixes
+    , suffixes
+    ]
+
 operator :: Parser BinaryOperator
 operator =
   choice
@@ -182,7 +192,7 @@ operator =
 
 operators :: Parser (UngroupedTerm Stx.Expr BinaryOperator)
 operators =
-  UngroupedTerm <$> suffixes <*> (spaces *> optionMaybe ((,) <$> operator <*> (spaces *> operators)))
+  UngroupedTerm <$> prefixes <*> (spaces *> optionMaybe ((,) <$> operator <*> (spaces *> operators)))
 
 opToExpr :: BinaryOperator -> Stx.Expr -> Stx.Expr -> Stx.Expr
 opToExpr (FunOp op) a b = Stx.Call (Stx.Var (Stx.Path [] (Stx.OperatorIdent op))) (Stx.Tuple a b)

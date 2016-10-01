@@ -9,6 +9,7 @@ module ParseIdent
   , escapable
   , keyword
   , operatorIdent
+  , prefixOperatorIdent
 
   -- Lower-level combinators with explicit reserved word handling
   , CheckReserved (..)
@@ -125,6 +126,8 @@ varIdent' reserved =
     [ try $ fst <$> varIdentNonDotWithSlot' reserved trivialSlot
     , flip Stx.VarIdent (Stx.BodySlot Stx.EmptyTail) <$> ident' reserved
     , try $ char '.' *> spaces *> (fst <$> varIdentDotSuffixWithSlot' reserved trivialSlot)
+    , try $
+      (Stx.PrefixOperatorIdent <$> prefixOperatorIdent) <* spaces <* char '(' <* spaces <* char ')'
     , try $ Stx.OperatorIdent <$> operatorIdent
     ]
 
@@ -151,6 +154,13 @@ operatorIdent =
     , try (string "||") *> pure Stx.OpOr -- `try` to prevent ambiguities with closure arguments
 
     , char '@' *> pure Stx.OpAt
+    ]
+
+prefixOperatorIdent :: Parser Stx.PrefixOperatorIdent
+prefixOperatorIdent =
+  choice
+    [ char '-' *> pure Stx.OpNegate
+    , char '~' *> pure Stx.OpNot
     ]
 
 typeIdent' :: CheckReserved -> Parser Stx.TypeIdent
