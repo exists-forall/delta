@@ -14,7 +14,7 @@ import ParsePat (pat)
 import Precedence
 import DeltaPrecedence
 
-import Data.Bifunctor (bimap, first)
+import Data.Bifunctor (bimap, first, second)
 
 mark :: Parser Stx.Expr -> Parser Stx.Expr
 mark p = Stx.Mark <$> getPosition <*> p <*> getPosition
@@ -114,6 +114,16 @@ func :: Parser Stx.Expr
 func =
   Stx.Func <$> funcArgs <*> block
 
+assembleZeroPlusSlots :: [Stx.Expr] -> Maybe Stx.Expr
+assembleZeroPlusSlots [] = Nothing
+assembleZeroPlusSlots slots = Just $ foldr1 Stx.Tuple slots
+
+partialCallChain :: Parser Stx.Expr
+partialCallChain =
+  mark $
+  (Stx.PartialCallChain . map (second assembleZeroPlusSlots)) <$> many1
+    (char '.' *> spaces *> qualifiedCall (varIdentDotSuffixWithSlot' ForbidReserved slot) <* spaces)
+
 atomicExpr :: Parser Stx.Expr
 atomicExpr = choice
   [ parenthesized
@@ -123,6 +133,7 @@ atomicExpr = choice
   , litString
   , litSeq
   , func
+  , partialCallChain
   ]
 
 data Suffix

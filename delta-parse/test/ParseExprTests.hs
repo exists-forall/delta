@@ -258,6 +258,71 @@ test = describe "ParseExpr" $ do
       parseExpr "x . c ( M::N::y.M::N::B ) . e (M::N::y) f()" `shouldBe`
         Right (Call e (Tuple (Call c (Tuple x (Call b y))) (Tuple y Unit)))
 
+    it "parses minimal partial dot calls" $
+      parseExpr ". a" `shouldBe` Right
+        (PartialCallChain [(Path [] $ DotVarIdent (simpleIdent A) EmptyTail, Nothing)])
+
+    it "parses qualified partial dot calls" $
+      parseExpr ". M :: N :: b" `shouldBe` Right
+        (PartialCallChain
+          [ ( Path [ModuleIdent M [], ModuleIdent N []] $ DotVarIdent (simpleIdent B) EmptyTail
+            , Nothing
+            )
+          ]
+        )
+
+    it "parses partial dot calls with slots" $
+      parseExpr ". c ( )" `shouldBe` Right
+        (PartialCallChain [(Path [] $ DotVarIdent (simpleIdent C) $ TailSlot EmptyTail, Just Unit)])
+
+    it "parses partial dot calls with filled slots" $
+      parseExpr ". c ( x )" `shouldBe` Right
+        (PartialCallChain [(Path [] $ DotVarIdent (simpleIdent C) $ TailSlot EmptyTail, Just x)])
+
+    it "parses partial dot calls with multiple slots" $
+      parseExpr ". d ( M :: N :: y ) ( f )" `shouldBe` Right
+        (PartialCallChain
+          [(Path [] $ DotVarIdent (simpleIdent D) $ TailSlot $ TailSlot EmptyTail, Just (Tuple y f))]
+        )
+
+    it "parses partal dot calls with words and slots interleaved" $
+      parseExpr ". e ( f ) f ( M :: N :: G )" `shouldBe` Right
+        (PartialCallChain
+          [ ( Path []
+              $ DotVarIdent (simpleIdent E)
+              $ TailSlot
+              $ TailWord (simpleIdent F)
+              $ TailSlot EmptyTail
+            , Just $ Tuple f g
+            )
+          ]
+        )
+
+    it "parses chained partial dot calls" $
+      parseExpr ". a . M :: N :: b" `shouldBe` Right
+        (PartialCallChain
+          [ (Path [] $ DotVarIdent (simpleIdent A) EmptyTail, Nothing)
+          , ( Path [ModuleIdent M [], ModuleIdent N []] $ DotVarIdent (simpleIdent B) EmptyTail
+            , Nothing
+            )
+          ]
+        )
+
+    it "parses chained partial dot calls with slots" $
+      parseExpr ". c ( x ) . e ( M :: N :: y ) f ( f )" `shouldBe` Right
+        (PartialCallChain
+          [ (Path [] $ DotVarIdent (simpleIdent C) $ TailSlot EmptyTail, Just x)
+          , ( Path []
+              $ DotVarIdent (simpleIdent E)
+              $ TailSlot
+              $ TailWord (simpleIdent F)
+              $ TailSlot
+              $ EmptyTail
+            , Just $ Tuple y f
+            )
+          ]
+        )
+
     it "parses calls of parenthesized expressions" $
       parseExpr "( f ) ( x )" `shouldBe` Right (Call f x)
 

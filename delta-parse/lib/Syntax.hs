@@ -4,6 +4,8 @@ import Text.Parsec (SourcePos)
 
 import Numeric.Natural (Natural)
 
+import Data.Bifunctor (second)
+
 {-
 This might seem like madness, but there is an exact one-to-one correspondence between valid Delta
 identifiers and the inhabitants of this type.  This representation perfectly encodes the invariants.
@@ -74,6 +76,10 @@ data Expr
   | Call Expr Expr
   | Func Pat Expr
   | Let Pat Expr Expr
+  | PartialCallChain [(Path VarIdent, Maybe Expr)]
+  -- NOTE: PartialCallChain encodes neither the invariant that the VarIdent should always be a
+  -- DotVarIdent, nor the inavriant that the list of composed functions should always be nonempty.
+  -- What should be done about this?
   | Mark SourcePos Expr SourcePos
   deriving (Eq, Ord, Show)
 
@@ -136,6 +142,7 @@ stripMarks (Call a b) = Call (stripMarks a) (stripMarks b)
 stripMarks (Func pat ret) = Func (stripPatMarks (fmap stripTypeMarks) pat) (stripMarks ret)
 stripMarks (Let pat e ret) =
   Let (stripPatMarks (fmap stripTypeMarks) pat) (stripMarks e) (stripMarks ret)
+stripMarks (PartialCallChain cs) = PartialCallChain (map (second (fmap stripMarks)) cs)
 stripMarks (Mark _ e _) = stripMarks e
 
 stripTypeMarks :: Type -> Type
