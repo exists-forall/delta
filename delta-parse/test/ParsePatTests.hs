@@ -10,6 +10,7 @@ import ParsePat
 
 import Syntax
 import ParseUtils
+import SyntaxUtils
 
 import Data.Either (isLeft)
 
@@ -19,29 +20,23 @@ parsePat = fmap (stripPatMarks (fmap stripTypeMarks)) . fullParse pat
 parseTypedPat :: Text -> Either ParseError TypedPat
 parseTypedPat = fmap (stripPatMarks stripTypeMarks) . fullParse typedPat
 
-simpleIdent :: Letter -> VarIdent
-simpleIdent l = VarIdent (Ident (Alpha LowerCase l) []) $ BodySlot EmptyTail
-
-simpleType :: Letter -> Type
-simpleType l = TypeAtom $ Path [] $ TypeIdent l []
-
 test :: Spec
 test = describe "ParsePat" $ do
 
-  let x = PatVar (simpleIdent X) Nothing
-  let xAsA = PatVar (simpleIdent X) (Just $ simpleType A)
-  let xAsARequired = PatVar (simpleIdent X) (simpleType A)
+  let x = PatVar (simpleVar X) Nothing
+  let xAsA = PatVar (simpleVar X) (Just $ simpleType A)
+  let xAsARequired = PatVar (simpleVar X) (simpleType A)
 
-  let y = PatVar (simpleIdent Y) Nothing
-  let yAsB = PatVar (simpleIdent Y) (Just $ simpleType B)
-  let yAsBRequired = PatVar (simpleIdent Y) (simpleType B)
+  let y = PatVar (simpleVar Y) Nothing
+  let yAsB = PatVar (simpleVar Y) (Just $ simpleType B)
+  let yAsBRequired = PatVar (simpleVar Y) (simpleType B)
 
-  let z = PatVar (simpleIdent Z) Nothing
-  let zAsTupleAB = PatVar (simpleIdent Z) (Just $ TypeTuple (simpleType A) (simpleType B))
-  let zAsTupleABRequired = PatVar (simpleIdent Z) (TypeTuple (simpleType A) (simpleType B))
+  let z = PatVar (simpleVar Z) Nothing
+  let zAsTupleAB = PatVar (simpleVar Z) (Just $ TypeTuple (simpleType A) (simpleType B))
+  let zAsTupleABRequired = PatVar (simpleVar Z) (TypeTuple (simpleType A) (simpleType B))
 
-  let wAsFuncAB = PatVar (simpleIdent W) (Just $ TypeFunc (simpleType A) TypePure (simpleType B))
-  let wAsFuncABRequired = PatVar (simpleIdent W) (TypeFunc (simpleType A) TypePure (simpleType B))
+  let wAsFuncAB = PatVar (simpleVar W) (Just $ TypeFunc (simpleType A) TypePure (simpleType B))
+  let wAsFuncABRequired = PatVar (simpleVar W) (TypeFunc (simpleType A) TypePure (simpleType B))
 
   let ignore = PatIgnore Nothing
   let ignoreAsA = PatIgnore (Just $ simpleType A)

@@ -9,35 +9,12 @@ import Test.Hspec
 import ParseDecl
 import Syntax
 import ParseUtils
+import SyntaxUtils
 
 import Data.Either (isLeft)
 
 parseDecl :: Text -> Either ParseError Decl
 parseDecl = fmap stripDeclMarks . fullParse decl
-
-simpleIdent :: Letter -> Ident
-simpleIdent l = Ident (Alpha LowerCase l) []
-
-simpleVar :: Letter -> VarIdent
-simpleVar l = VarIdent (simpleIdent l) $ BodySlot EmptyTail
-
-simplePatVar :: Letter -> Pat
-simplePatVar l = PatVar (simpleVar l) Nothing
-
-simpleVarExpr :: Letter -> Expr
-simpleVarExpr l = Var $ Path [] $ simpleVar l
-
-simpleTIdent :: Letter -> TypeIdent
-simpleTIdent l = TypeIdent l []
-
-simpleTypeVar :: Letter -> TypeVarIdent
-simpleTypeVar l = TypeVarIdent l []
-
-simpleType :: Letter -> Type
-simpleType l = TypeAtom $ Path [] $ simpleTIdent l
-
-simpleModule :: Letter -> ModuleIdent
-simpleModule l = ModuleIdent l []
 
 test :: Spec
 test = describe "ParseDecl" $ do

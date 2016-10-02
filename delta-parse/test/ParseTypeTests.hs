@@ -9,6 +9,7 @@ import Test.Hspec
 import ParseType
 import Syntax
 import ParseUtils
+import SyntaxUtils
 
 import Data.Either (isLeft)
 
@@ -18,14 +19,14 @@ parseType = fmap stripTypeMarks . fullParse type_
 test :: Spec
 test = describe "ParseType" $ do
   let
-    a = TypeAtom $ Path [] $ TypeIdent A []
-    b = TypeAtom $ Path [] $ TypeIdent B []
-    c = TypeAtom $ Path [ModuleIdent M [], ModuleIdent N []] $ TypeIdent C []
+    a = simpleType A
+    b = simpleType B
+    c = TypeAtom $ Path [simpleModule M, simpleModule N] $ simpleTIdent C
 
     pureAtom = TypeAtom $ Path [] $ TypeIdent P $ map (StartChar . Alpha LowerCase) [U, R, E]
 
-    x = TypeVar $ TypeVarIdent X []
-    y = TypeVar $ TypeVarIdent Y []
+    x = TypeVar $ simpleTypeVar X
+    y = TypeVar $ simpleTypeVar Y
 
     doVar = TypeVar $ TypeVarIdent D [StartChar (Alpha LowerCase O)]
 

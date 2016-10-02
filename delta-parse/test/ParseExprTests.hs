@@ -9,14 +9,9 @@ import Test.Hspec
 import ParseExpr
 import Syntax
 import ParseUtils
+import SyntaxUtils
 
 import Data.Either (isLeft)
-
-simpleIdent :: Letter -> Ident
-simpleIdent l = Ident (Alpha LowerCase l) []
-
-simpleUpperIdent :: Letter -> Ident
-simpleUpperIdent l = Ident (Alpha UpperCase l) []
 
 parseExpr :: Text -> Either ParseError Expr
 parseExpr = fmap stripMarks . fullParse expr
