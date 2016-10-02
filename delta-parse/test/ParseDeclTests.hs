@@ -18,7 +18,6 @@ parseDecl = fmap stripDeclMarks . fullParse decl
 
 test :: Spec
 test = describe "ParseDecl" $ do
-  let typeIdentPure = TypeIdent P $ map (StartChar . Alpha LowerCase) [U, R, E]
   let typeVarDo = TypeVarIdent D [StartChar $ Alpha LowerCase O]
 
   describe "function defs" $ do

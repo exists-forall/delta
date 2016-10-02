@@ -119,6 +119,24 @@ data Stub
   | StubImplement (Path TypeIdent) Type [Constraint]
   deriving (Eq, Ord, Show)
 
+data PossibleAlias a = Alias a a | NoAlias a deriving (Eq, Ord, Show)
+
+data ExportSymbol
+  = ExportType (PossibleAlias TypeIdent)
+  | ExportInteraction (PossibleAlias TypeIdent)
+  | ExportProtocol (PossibleAlias TypeIdent)
+  | ExportDef (PossibleAlias VarIdent)
+  deriving (Eq, Ord, Show)
+
+data ExportSymbols
+  = ExportSpecific [ExportSymbol]
+  | ExportEverything
+  deriving (Eq, Ord, Show)
+
+data Import = Import (PossibleAlias (Path ModuleIdent)) ExportSymbols deriving (Eq, Ord, Show)
+
+data Module = Module ExportSymbols [Import] [Decl] deriving (Eq, Ord, Show)
+
 -- For testing purposes:
 
 stripPatMarks :: (annot -> annot) -> Pat' annot -> Pat' annot
@@ -181,3 +199,6 @@ stripDeclMarks (MarkDecl _ d _) = stripDeclMarks d
 stripStubMarks :: Stub -> Stub
 stripStubMarks (StubDef i t c) = StubDef i (stripTypeMarks t) (map stripConstraintMarks c)
 stripStubMarks (StubImplement p t c) = StubImplement p (stripTypeMarks t) (map stripConstraintMarks c)
+
+stripModuleMarks :: Module -> Module
+stripModuleMarks (Module x i d) = Module x i (map stripDeclMarks d)

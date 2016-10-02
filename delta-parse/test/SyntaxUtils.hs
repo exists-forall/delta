@@ -28,3 +28,6 @@ simpleType l = TypeAtom $ Path [] $ simpleTIdent l
 
 simpleModule :: Letter -> ModuleIdent
 simpleModule l = ModuleIdent l []
+
+typeIdentPure :: TypeIdent
+typeIdentPure = TypeIdent P $ map (StartChar . Alpha LowerCase) [U, R, E]

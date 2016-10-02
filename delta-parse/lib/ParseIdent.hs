@@ -43,6 +43,9 @@ reservedWord =
     , "where"
     , "interaction"
     , "message"
+    , "export"
+    , "import"
+    , "everything"
     ]
 
 data CheckReserved = AllowReserved | ForbidReserved

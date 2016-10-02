@@ -6,6 +6,7 @@ import qualified ParsePatTests
 import qualified DeltaPrecedenceTests
 import qualified ParseTypeTests
 import qualified ParseDeclTests
+import qualified ParseModuleTests
 
 import Test.Hspec
 
@@ -17,4 +18,5 @@ main = hspec $ do
     ParsePatTests.test
     ParseTypeTests.test
     ParseDeclTests.test
+    ParseModuleTests.test
     DeltaPrecedenceTests.test
