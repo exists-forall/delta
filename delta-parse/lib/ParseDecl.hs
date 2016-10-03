@@ -5,8 +5,6 @@ where
 
 import ParseUtils
 
-import Data.Text (Text)
-
 import qualified Syntax as Stx
 import ParseIdent
 import ParsePat (typedPat)

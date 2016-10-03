@@ -6,15 +6,13 @@ where
 
 import ParseUtils
 
-import Data.Text (Text)
-
 import qualified Syntax as Stx
 import ParseIdent
 import ParsePat (pat)
 import Precedence
 import DeltaPrecedence
 
-import Data.Bifunctor (bimap, first, second)
+import Data.Bifunctor (first, second)
 
 mark :: Parser Stx.Expr -> Parser Stx.Expr
 mark p = Stx.Mark <$> getPosition <*> p <*> getPosition

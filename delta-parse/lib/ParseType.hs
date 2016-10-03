@@ -7,8 +7,6 @@ where
 
 import ParseUtils
 
-import Data.Text (Text)
-
 import qualified Syntax as Stx
 import ParseIdent (keyword, escapable, path, typeIdent', typeVarIdent')
 
