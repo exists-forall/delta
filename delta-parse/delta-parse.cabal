@@ -51,6 +51,7 @@ test-suite delta-parse-tests
                      , ParseUtils
                      , SyntaxUtils
                      , FormatIdent
+                     , StripMarks
 
                      , ParseIdent
                      , ParseIdentTests

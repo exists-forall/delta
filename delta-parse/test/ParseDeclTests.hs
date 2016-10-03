@@ -8,6 +8,7 @@ import Test.Hspec
 
 import ParseDecl
 import Syntax
+import StripMarks (stripDeclMarks)
 import ParseUtils
 import SyntaxUtils
 

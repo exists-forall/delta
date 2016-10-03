@@ -8,6 +8,7 @@ import Test.Hspec
 
 import ParseModule
 import Syntax
+import StripMarks (stripModuleMarks)
 import ParseUtils
 import SyntaxUtils
 
