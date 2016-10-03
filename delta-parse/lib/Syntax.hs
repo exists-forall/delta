@@ -1,10 +1,31 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
+
 module Syntax where
 
-import Text.Parsec (SourcePos)
+import GHC.Generics (Generic)
 
-import Numeric.Natural (Natural)
+import qualified Data.Aeson.Types as Aeson
+import Data.Text.Lazy (fromStrict)
+import Data.Text (unpack)
 
 import Data.Bifunctor (second)
+
+import ParseUtils (Parser, fullParse, SourcePos)
+import {-# SOURCE #-} ParseIdent
+import {-# SOURCE #-} FormatIdent
+
+-- This is an internal utility function, so it really shouldn't be exported
+toJSONParser :: String -> (CheckReserved -> Parser a) -> Aeson.Value -> Aeson.Parser a
+
+toJSONParser typeName p (Aeson.String src) =
+  case fullParse (p AllowReserved) (fromStrict src) of
+    Right result -> return result
+    Left _ -> fail ("Malformed " ++ typeName ++ ": " ++ unpack src)
+
+toJSONParser typeName _ x =
+  Aeson.typeMismatch typeName x
 
 {-
 This might seem like madness, but there is an exact one-to-one correspondence between valid Delta
@@ -16,6 +37,12 @@ data IdentStartChar = Alpha Capitalization Letter | Underscore deriving (Eq, Ord
 data Digit = D0|D1|D2|D3|D4|D5|D6|D7|D8|D9 deriving (Eq, Ord, Show, Enum)
 data IdentChar = StartChar IdentStartChar | Digit Digit deriving (Eq, Ord, Show)
 data Ident = Ident IdentStartChar [IdentChar] deriving (Eq, Ord, Show)
+
+instance Aeson.FromJSON Ident where
+  parseJSON = toJSONParser "Ident" ident'
+
+instance Aeson.ToJSON Ident where
+  toJSON = Aeson.String . formatIdent
 
 data OperatorIdent
   -- Mathematical operators
@@ -43,99 +70,267 @@ data VarIdent
   | PrefixOperatorIdent PrefixOperatorIdent
   deriving (Eq, Ord, Show)
 
+instance Aeson.FromJSON VarIdent where
+  parseJSON = toJSONParser "VarIdent" varIdent'
+
+instance Aeson.ToJSON VarIdent where
+  toJSON = Aeson.String . formatVarIdent
+
 -- All types begin with an uppercase letter
 data TypeIdent = TypeIdent Letter [IdentChar] deriving (Eq, Ord, Show)
+
+instance Aeson.FromJSON TypeIdent where
+  parseJSON = toJSONParser "TypeIdent" typeIdent'
+
+instance Aeson.ToJSON TypeIdent where
+  toJSON = Aeson.String . formatTypeIdent
 
 -- All type variables begin with a lowercase letter
 data TypeVarIdent = TypeVarIdent Letter [IdentChar] deriving (Eq, Ord, Show)
 
+instance Aeson.FromJSON TypeVarIdent where
+  parseJSON = toJSONParser "TypeVarIdent" typeVarIdent'
+
+instance Aeson.ToJSON TypeVarIdent where
+  toJSON = Aeson.String . formatTypeVarIdent
+
 -- All module names begin with an uppercase letter
 data ModuleIdent = ModuleIdent Letter [IdentChar] deriving (Eq, Ord, Show)
-data Path a = Path [ModuleIdent] a deriving (Eq, Ord, Show)
 
-data StringComponent = Char Char | Interpolate Expr deriving (Eq, Ord, Show)
+instance Aeson.FromJSON ModuleIdent where
+  parseJSON = toJSONParser "ModuleIdent" moduleIdent'
+
+instance Aeson.ToJSON ModuleIdent where
+  toJSON = Aeson.String . formatModuleIdent
+
+data Path a
+  = Path
+    { path :: [ModuleIdent]
+    , name :: a
+    }
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
+
+data StringComponent
+  = Chars
+    { chars :: String
+    }
+  | Interpolate
+    { interpolate_expr :: Expr
+    }
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
 data Pat' annot
-  = PatVar VarIdent annot
-  | PatTuple (Pat' annot) (Pat' annot)
-  | PatIgnore annot
+  = PatVar
+    { pat_var_name :: VarIdent
+    , pat_var_type :: annot
+    }
+  | PatTuple
+    { pat_tuple_left :: Pat' annot
+    , pat_tuple_right :: Pat' annot
+    }
+  | PatIgnore
+    { pat_ignore_type :: annot
+    }
   | PatUnit
-  | MarkPat SourcePos (Pat' annot) SourcePos
-  deriving (Eq, Ord, Show)
+  | MarkPat
+    { pat_source_start :: SourcePos
+    , enclosed_pat :: Pat' annot
+    , pat_source_end :: SourcePos
+    }
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
 type Pat = Pat' (Maybe Type)
 type TypedPat = Pat' Type
 
 data Expr
-  = Var (Path VarIdent)
-  | LitUInt Natural
-  | LitString [StringComponent]
-  | LitSeq [Expr]
+  = Var
+    { var_name :: Path VarIdent
+    }
+  | LitUInt
+    { uint_value :: Integer
+    }
+  | LitString
+    { string_components :: [StringComponent]
+    }
+  | LitSeq
+    { seq_items :: [Expr]
+    }
   | Unit
-  | Tuple Expr Expr
-  | Call Expr Expr
-  | Func Pat Expr
-  | Let Pat Expr Expr
-  | PartialCallChain [(Path VarIdent, Maybe Expr)]
+  | Tuple
+    { tuple_left :: Expr
+    , tuple_right :: Expr
+    }
+  | Call
+    { call_function :: Expr
+    , call_argument :: Expr
+    }
+  | Func
+    { func_params_pat :: Pat
+    , func_body :: Expr
+    }
+  | Let
+    { let_pat :: Pat
+    , let_value :: Expr
+    , let_body :: Expr
+    }
+  | PartialCallChain
+    { partial_calls :: [(Path VarIdent, Maybe Expr)]
+    }
   -- NOTE: PartialCallChain encodes neither the invariant that the VarIdent should always be a
   -- DotVarIdent, nor the inavriant that the list of composed functions should always be nonempty.
   -- What should be done about this?
-  | Mark SourcePos Expr SourcePos
-  deriving (Eq, Ord, Show)
+  | Mark
+    { source_start :: SourcePos
+    , enclosed :: Expr
+    , source_end :: SourcePos
+    }
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
 data Type
-  = TypeAtom (Path TypeIdent)
-  | TypeVar TypeVarIdent
-  | TypeApp Type Type
-  | TypeTuple Type Type
-  | TypeFunc Type Type Type
-  | TypeInters Type Type
+  = TypeAtom
+    { type_name :: Path TypeIdent
+    }
+  | TypeVar
+    { type_var_name :: TypeVarIdent
+    }
+  | TypeApp
+    { type_head :: Type
+    , type_argument :: Type
+    }
+  | TypeTuple
+    { type_tuple_left :: Type
+    , type_tuple_right :: Type
+    }
+  | TypeFunc
+    { type_func_argument :: Type
+    , type_func_interaction :: Type
+    , type_func_return :: Type
+    }
+  | TypeInters
+    { type_inters_left :: Type
+    , type_inters_right :: Type
+    }
   | TypePure
   | TypeUnit
   | TypeNever
-  | MarkType SourcePos Type SourcePos
-  deriving (Eq, Ord, Show)
+  | MarkType
+    { type_source_start :: SourcePos
+    , enclosed_type :: Type
+    , type_source_end :: SourcePos
+    }
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
 data StructComponent
-  = StructField Ident Type
-  | StructCase TypeIdent [StructComponent]
-  deriving (Eq, Ord, Show)
+  = StructField
+    { struct_field_name :: Ident
+    , struct_field_type :: Type
+    }
+  | StructCase
+    { struct_case_name :: TypeIdent
+    , struct_case_body :: [StructComponent]
+    }
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
 data Constraint
-  = ConstraintImplement (Path TypeIdent) (Type)
-  deriving (Eq, Ord, Show)
+  = ConstraintImplement
+    { constraint_implement_protocol :: Path TypeIdent
+    , constraint_implement_argument :: Type
+    }
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
 data Decl
-  = DeclDef TypedPat [Constraint] Expr
-  | DeclTypeStruct TypeIdent [TypeVarIdent] [StructComponent]
-  | DeclProtocol TypeIdent TypeVarIdent [Stub]
-  | DeclImplement (Path TypeIdent) Type [Constraint] [(TypedPat, [Constraint], Expr)]
-  | DeclInteraction TypeIdent [TypeVarIdent] [(Ident, Type, Type)]
-  | MarkDecl SourcePos Decl SourcePos
-  deriving (Eq, Ord, Show)
+  = DeclDef
+    { decl_def_pat :: TypedPat
+    , decl_def_constraints :: [Constraint]
+    , decl_def_value :: Expr
+    }
+  | DeclTypeStruct
+    { decl_type_struct_name :: TypeIdent
+    , decl_type_struct_params :: [TypeVarIdent]
+    , decl_type_struct_body :: [StructComponent]
+    }
+  | DeclProtocol
+    { decl_protocol_name :: TypeIdent
+    , decl_protocol_param :: TypeVarIdent
+    , decl_protocol_body :: [Stub]
+    }
+  | DeclImplement
+    { decl_implement_protocol :: Path TypeIdent
+    , decl_implement_argument :: Type
+    , decl_implement_constraints :: [Constraint]
+    , decl_implement_body :: [(TypedPat, [Constraint], Expr)]
+    }
+  | DeclInteraction
+    { decl_interaction_name :: TypeIdent
+    , decl_interaction_params :: [TypeVarIdent]
+    , decl_interaction_body :: [(Ident, Type, Type)]
+    }
+  | MarkDecl
+    { decl_source_start :: SourcePos
+    , enclosed_decl :: Decl
+    , decl_source_end :: SourcePos
+    }
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
 data Stub
-  = StubDef VarIdent Type [Constraint]
-  | StubImplement (Path TypeIdent) Type [Constraint]
-  deriving (Eq, Ord, Show)
+  = StubDef
+    { stub_def_name :: VarIdent
+    , stub_def_type :: Type
+    , stub_def_constraints :: [Constraint]
+    }
+  | StubImplement
+    { stub_implement_protocol :: Path TypeIdent
+    , stub_implement_argument :: Type
+    , stub_implement_constraints :: [Constraint]
+    }
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
-data PossibleAlias a = Alias a a | NoAlias a deriving (Eq, Ord, Show)
+data PossibleAlias a
+  = Alias
+    { symbol_new_name :: a
+    , symbol_original_name :: a
+    }
+  | NoAlias
+    { symbol_name :: a
+    }
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
-data ExportSymbol
-  = ExportType (PossibleAlias TypeIdent)
-  | ExportInteraction (PossibleAlias TypeIdent)
-  | ExportProtocol (PossibleAlias TypeIdent)
-  | ExportDef (PossibleAlias VarIdent)
-  deriving (Eq, Ord, Show)
+data Symbol
+  = SymbolType
+    { symbol_type :: PossibleAlias TypeIdent
+    }
+  | SymbolInteraction
+    { symbol_interaction :: PossibleAlias TypeIdent
+    }
+  | SymbolProtocol
+    { symbol_protocol :: PossibleAlias TypeIdent
+    }
+  | SymbolDef
+    { symbol_def :: PossibleAlias VarIdent
+    }
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
-data ExportSymbols
-  = ExportSpecific [ExportSymbol]
-  | ExportEverything
-  deriving (Eq, Ord, Show)
+data Symbols
+  = SymbolsSpecific
+    { symbols_specific :: [Symbol]
+    }
+  | SymbolsEverything
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
-data Import = Import (PossibleAlias (Path ModuleIdent)) ExportSymbols deriving (Eq, Ord, Show)
+data Import
+  = Import
+    { import_module :: PossibleAlias (Path ModuleIdent)
+    , import_symbols :: Symbols
+    }
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
-data Module = Module ExportSymbols [Import] [Decl] deriving (Eq, Ord, Show)
+data Module
+  = Module
+    { module_export_symbols :: Symbols
+    , module_imports :: [Import]
+    , module_body :: [Decl]
+    }
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
 -- For testing purposes:
 
@@ -151,7 +346,7 @@ stripMarks :: Expr -> Expr
 stripMarks (Var v) = Var v
 stripMarks (LitUInt i) = LitUInt i
 stripMarks (LitString s) = LitString (map stripComponentMarks s) where
-  stripComponentMarks (Char c) = Char c
+  stripComponentMarks (Chars c) = Chars c
   stripComponentMarks (Interpolate e) = Interpolate (stripMarks e)
 stripMarks (LitSeq xs) = LitSeq (map stripMarks xs)
 stripMarks Unit = Unit

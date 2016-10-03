@@ -33,11 +33,13 @@ library
                      , ParseModule
                      , Precedence
                      , DeltaPrecedence
+                     , FormatIdent
 
   build-depends:       base >= 4.7 && < 5
                      , parsec
                      , text
                      , containers
+                     , aeson
   default-language:    Haskell2010
 
 test-suite delta-parse-tests
@@ -48,6 +50,7 @@ test-suite delta-parse-tests
   other-modules:       Syntax
                      , ParseUtils
                      , SyntaxUtils
+                     , FormatIdent
 
                      , ParseIdent
                      , ParseIdentTests
@@ -77,5 +80,6 @@ test-suite delta-parse-tests
                      , parsec
                      , text
                      , containers
+                     , aeson
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010

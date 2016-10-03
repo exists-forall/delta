@@ -19,28 +19,28 @@ possibleAlias :: Parser a -> Parser (Stx.PossibleAlias a)
 possibleAlias p =
   assemblePossibleAlias <$> (p <* spaces) <*> optionMaybe (char '=' *> spaces *> p)
 
-exportSymbol :: Parser Stx.ExportSymbol
-exportSymbol =
+symbol :: Parser Stx.Symbol
+symbol =
   choice
     [ keyword "type" *> spaces *>
-      (Stx.ExportType <$> possibleAlias (escapable typeIdent'))
+      (Stx.SymbolType <$> possibleAlias (escapable typeIdent'))
     , keyword "interaction" *> spaces *>
-      (Stx.ExportInteraction <$> possibleAlias (escapable typeIdent'))
+      (Stx.SymbolInteraction <$> possibleAlias (escapable typeIdent'))
     , keyword "protocol" *> spaces *>
-      (Stx.ExportProtocol <$> possibleAlias (escapable typeIdent'))
-    , Stx.ExportDef <$> possibleAlias (escapable varIdent')
+      (Stx.SymbolProtocol <$> possibleAlias (escapable typeIdent'))
+    , Stx.SymbolDef <$> possibleAlias (escapable varIdent')
     ]
 
-exportSymbols :: Parser Stx.ExportSymbols
-exportSymbols =
+symbols :: Parser Stx.Symbols
+symbols =
   choice
     [ char '{' *> spaces *>
       choice
-        [ keyword "everything" *> spaces *> optional (char ';') *> pure Stx.ExportEverything
-        , Stx.ExportSpecific <$> semicolonDelimited exportSymbol
+        [ keyword "everything" *> spaces *> optional (char ';') *> pure Stx.SymbolsEverything
+        , Stx.SymbolsSpecific <$> semicolonDelimited symbol
         ]
       <* spaces <* char '}'
-    , char ';' *> pure (Stx.ExportSpecific [])
+    , char ';' *> pure (Stx.SymbolsSpecific [])
     ]
 
 import_ :: Parser Stx.Import
@@ -48,14 +48,14 @@ import_ =
   keyword "import" *> spaces *>
     (Stx.Import
       <$> (possibleAlias (Stx.Path <$> path <*> escapable moduleIdent') <* spaces)
-      <*> exportSymbols
+      <*> symbols
     )
 
 module_ :: Parser Stx.Module
 module_ =
   spaces *>
   (Stx.Module
-    <$> (keyword "export" *> spaces *> exportSymbols <* spaces)
+    <$> (keyword "export" *> spaces *> symbols <* spaces)
     <*> many (import_ <* spaces)
     <*> many (decl <* spaces)
   )

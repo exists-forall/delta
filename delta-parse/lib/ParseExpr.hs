@@ -56,22 +56,28 @@ hexDigitValue =
 hexNumber :: Parser Int
 hexNumber = foldl ((+) . (16 *)) 0 <$> many1 hexDigitValue
 
-escapeSequence :: Parser Stx.StringComponent
+escapeSequence :: Parser Char
 escapeSequence = choice
-  [ char '\\' *> pure (Stx.Char '\\')
-  , char '"' *> pure (Stx.Char '"')
-  , char 'n' *> pure (Stx.Char '\n')
-  , char 't' *> pure (Stx.Char '\t')
-  , char 'r' *> pure (Stx.Char '\r')
-  , char 'u' *> char '{' *> ((Stx.Char . toEnum) <$> hexNumber) <* char '}'
-  , Stx.Interpolate <$> parenthesized
+  [ char '\\' *> pure '\\'
+  , char '"' *> pure '"'
+  , char 'n' *> pure '\n'
+  , char 't' *> pure '\t'
+  , char 'r' *> pure '\r'
+  , char 'u' *> char '{' *> (toEnum <$> hexNumber) <* char '}'
   ]
+
+stringChar :: Parser Char
+stringChar =
+  choice
+    [ noneOf "\"\\"
+    , try $ char '\\' *> escapeSequence
+    ]
 
 stringComponent :: Parser Stx.StringComponent
 stringComponent =
   choice
-    [ char '\\' *> escapeSequence
-    , Stx.Char <$> satisfy (/= '"')
+    [ Stx.Chars <$> many1 stringChar
+    , char '\\' *> (Stx.Interpolate <$> parenthesized)
     ]
 
 litString :: Parser Stx.Expr
