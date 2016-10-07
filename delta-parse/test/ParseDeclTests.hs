@@ -784,6 +784,10 @@ test = describe "ParseDecl" $ do
       parseDecl "interaction A { message f ( B ) -> C ; }" `shouldBe` Right
         (DeclInteraction (simpleTIdent A) [] [(simpleIdent F, simpleType B, simpleType C)])
 
+    it "parses interactions with messages with implicit argument type unit" $
+      parseDecl "interaction A { message f ( ) -> B ; }" `shouldBe` Right
+        (DeclInteraction (simpleTIdent A) [] [(simpleIdent F, TypeUnit, simpleType B)])
+
     it "parses interactions with messages with escaped names" $
       parseDecl "interaction A { message ` do ` ( B ) -> C ; }" `shouldBe` Right
         (DeclInteraction

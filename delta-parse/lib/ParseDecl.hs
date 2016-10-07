@@ -195,7 +195,7 @@ message =
   keyword "message" *> spaces *>
     ((,,)
       <$> (escapable ident' <* spaces)
-      <*> (char '(' *> spaces *> type_ <* spaces <* char ')' <* spaces)
+      <*> (char '(' *> spaces *> option Stx.TypeUnit type_ <* spaces <* char ')' <* spaces)
       <*> (string "->" *> spaces *> possibleFunc <* spaces)
     ) <* char ';'
 
