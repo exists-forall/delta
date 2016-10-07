@@ -18,11 +18,15 @@ executable delta-parse
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
                      , delta-parse
+                     , text
+                     , bytestring
+                     , aeson
   default-language:    Haskell2010
 
 library
   hs-source-dirs:      lib
   exposed-modules:     Syntax
+                     , Parse
 
   other-modules:       ParseUtils
                      , ParseIdent
@@ -34,6 +38,7 @@ library
                      , Precedence
                      , DeltaPrecedence
                      , FormatIdent
+                     , StripRedundantMarks
 
   build-depends:       base >= 4.7 && < 5
                      , parsec

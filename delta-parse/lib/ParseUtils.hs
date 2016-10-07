@@ -4,6 +4,7 @@
 module ParseUtils
   ( module Text.Parsec
   , SourcePos (..)
+  , fromParsecSourcePos
   , getPosition
   , Parser
   , both
