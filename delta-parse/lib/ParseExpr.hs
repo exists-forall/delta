@@ -13,6 +13,9 @@ import Precedence
 import DeltaPrecedence
 
 import Data.Bifunctor (first, second)
+import Data.Maybe (fromMaybe)
+
+import Data.Scientific (scientific)
 
 mark :: Parser Stx.Expr -> Parser Stx.Expr
 mark p = Stx.Mark <$> getPosition <*> p <*> getPosition
@@ -41,6 +44,22 @@ callNonDot =
 
 var :: Parser Stx.Expr
 var = mark $ Stx.Var <$> (Stx.Path <$> path <*> (Stx.varIdentText <$> escapableIdent))
+
+assembleFloat :: String -> String -> Maybe String -> Stx.Expr
+assembleFloat iPart fPart power =
+  let
+    floatCoefficient = read (iPart ++ fPart)
+    floatBase10Exponent = fromMaybe 0 (fmap read power) - length fPart
+  in
+    Stx.LitFloat $ scientific floatCoefficient floatBase10Exponent
+
+litFloat :: Parser Stx.Expr
+litFloat =
+  mark $ assembleFloat
+    <$> (try $ many1 digit <* char '.')
+    <*> (many digit)
+    <*> optionMaybe
+      (oneOf "eE" *> (((:) <$> char '-' <*> many1 digit) <|> (optional (char '+') *> many1 digit)))
 
 litUInt :: Parser Stx.Expr
 litUInt = mark $ (Stx.LitUInt . read) <$> many1 digit
@@ -135,6 +154,7 @@ atomicExpr = choice
   [ parenthesized
   , try callNonDot
   , var
+  , litFloat
   , litUInt
   , litString
   , litSeq

@@ -69,6 +69,7 @@ import GHC.Generics (Generic)
 
 import qualified Data.Aeson.Types as Aeson
 import Data.Text (Text)
+import Data.Scientific (Scientific)
 
 import {-# SOURCE #-} Utils.FormatIdent
 
@@ -220,6 +221,9 @@ data Expr
     }
   | LitUInt
     { uint_value :: Integer
+    }
+  | LitFloat
+    { float_value :: Scientific
     }
   | LitString
     { string_components :: [StringComponent]

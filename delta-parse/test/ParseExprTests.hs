@@ -14,6 +14,8 @@ import SyntaxUtils
 
 import Data.Either (isLeft)
 
+import Data.Scientific (scientific)
+
 parseExpr :: Text -> Either ParseError Expr
 parseExpr = fmap stripMarks . fullParse expr
 
@@ -157,6 +159,24 @@ test = describe "ParseExpr" $ do
 
     it "parses escaped prefix operators" $
       parseExpr "` - ( ) `" `shouldBe` Right (Var (Path [] (varIdentText (PrefixOperatorIdent OpNegate))))
+
+    it "parses floating point literals" $
+      parseExpr "42." `shouldBe` Right (LitFloat $ scientific 42 0)
+
+    it "parses floating point literals with fractional parts" $
+      parseExpr "3.14159265" `shouldBe` Right (LitFloat $ scientific 314159265 (-8))
+
+    it "parses floating point literals with positive base-10 exponents" $
+      parseExpr "0.1e15" `shouldBe` Right (LitFloat $ scientific 1 14)
+
+    it "parses floating point literals with negative base-10 exponents" $
+      parseExpr "0.1e-15" `shouldBe` Right (LitFloat $ scientific 1 (-16))
+
+    it "parses floating point literals with a capital E" $
+      parseExpr "1.234E5" `shouldBe` Right (LitFloat $ scientific 1234 2)
+
+    it "parses floating point literals with an explicit positive exopnent" $
+      parseExpr "1.234e+5" `shouldBe` Right (LitFloat $ scientific 1234 2)
 
     it "parses unsigned integer literals" $
       parseExpr "42" `shouldBe` Right (LitUInt 42)

@@ -13,6 +13,7 @@ stripPatMarks stripAnnot (MarkPat _ pat _) = stripPatMarks stripAnnot pat
 
 stripMarks :: Expr -> Expr
 stripMarks (Var v) = Var v
+stripMarks (LitFloat f) = LitFloat f
 stripMarks (LitUInt i) = LitUInt i
 stripMarks (LitString s) = LitString (map stripComponentMarks s) where
   stripComponentMarks (Chars c) = Chars c
