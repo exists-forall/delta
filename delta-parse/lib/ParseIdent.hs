@@ -74,20 +74,20 @@ checkReserved :: CheckReserved -> Parser a -> Parser a
 checkReserved AllowReserved p = p
 checkReserved ForbidReserved p = notFollowedBy reservedWord *> p
 
-ident' :: CheckReserved -> Parser Stx.Ident
+ident' :: CheckReserved -> Parser Stx.IdentText
 ident' reserved =
   flip label "identifier" $
   try $ checkReserved reserved $
-  Stx.Ident <$> identStartChar <*> many identChar
+  Stx.identText <$> (Stx.Ident <$> identStartChar <*> many identChar)
 
-ident :: Parser Stx.Ident
+ident :: Parser Stx.IdentText
 ident = ident' ForbidReserved
 
-moduleIdent' :: CheckReserved -> Parser Stx.ModuleIdent
+moduleIdent' :: CheckReserved -> Parser Stx.ModuleIdentText
 moduleIdent' reserved =
   flip label "module identifier" $
   try $ checkReserved reserved $
-  Stx.ModuleIdent <$> upperLetter <*> many identChar
+  Stx.moduleIdentText <$> (Stx.ModuleIdent <$> upperLetter <*> many identChar)
 
 varIdentTailWithSlot' :: CheckReserved -> Parser a -> Parser (Stx.VarIdentTail, [a])
 varIdentTailWithSlot' reserved slot =
@@ -166,20 +166,21 @@ prefixOperatorIdent =
     , char '~' *> pure Stx.OpNot
     ]
 
-typeIdent' :: CheckReserved -> Parser Stx.TypeIdent
+typeIdent' :: CheckReserved -> Parser Stx.TypeIdentText
 typeIdent' reserved =
   flip label "type identifier" $
   try $ checkReserved reserved $
-  Stx.TypeIdent <$> upperLetter <*> many identChar
+  Stx.typeIdentText <$> (Stx.TypeIdent <$> upperLetter <*> many identChar)
 
-typeVarIdent' :: CheckReserved -> Parser Stx.TypeVarIdent
+typeVarIdent' :: CheckReserved -> Parser Stx.TypeVarIdentText
 typeVarIdent' reserved =
   flip label "type variable" $
   try $ checkReserved reserved $
-  Stx.TypeVarIdent <$> lowerLetter <*> many identChar
+  Stx.typeVarIdentText <$> (Stx.TypeVarIdent <$> lowerLetter <*> many identChar)
 
-path :: Parser [Stx.ModuleIdent]
-path = many (try $ escapable moduleIdent' <* spaces <* char ':' <* char ':' <* spaces)
+path :: Parser [Stx.ModuleIdentText]
+path =
+  many $ try $ escapable moduleIdent' <* spaces <* char ':' <* char ':' <* spaces
 
 escapableIdent :: Parser Stx.VarIdent
 escapableIdent =

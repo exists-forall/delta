@@ -20,19 +20,21 @@ parseExpr = fmap stripMarks . fullParse expr
 test :: Spec
 test = describe "ParseExpr" $ do
   let
-    m = ModuleIdent M []
-    n = ModuleIdent N []
+    m = simpleModule M
+    n = simpleModule N
 
     -- Simple variables
 
     x = Var
       $ Path []
+      $ varIdentText
       $ VarIdent (simpleIdent X)
       $ BodySlot
       $ EmptyTail
 
     y = Var
       $ Path [m, n]
+      $ varIdentText
       $ VarIdent (simpleIdent Y)
       $ BodySlot
       $ EmptyTail
@@ -41,18 +43,21 @@ test = describe "ParseExpr" $ do
 
     f = Var
       $ Path []
+      $ varIdentText
       $ VarIdent (simpleIdent F)
       $ BodySlot
       $ EmptyTail
 
     g = Var
       $ Path [m, n]
+      $ varIdentText
       $ VarIdent (simpleUpperIdent G)
       $ BodySlot
       $ EmptyTail
 
     h = Var
       $ Path []
+      $ varIdentText
       $ VarIdent (simpleIdent H)
       $ BodySlot
       $ TailSlot
@@ -60,6 +65,7 @@ test = describe "ParseExpr" $ do
 
     i = Var
       $ Path []
+      $ varIdentText
       $ VarIdent (simpleIdent I)
       $ BodySlot
       $ TailWord (simpleIdent J)
@@ -68,6 +74,7 @@ test = describe "ParseExpr" $ do
 
     k = Var
       $ Path []
+      $ varIdentText
       $ VarIdent (simpleIdent K)
       $ BodyWord (simpleIdent L)
       $ BodySlot
@@ -77,22 +84,26 @@ test = describe "ParseExpr" $ do
 
     a = Var
       $ Path []
+      $ varIdentText
       $ DotVarIdent (simpleIdent A)
       $ EmptyTail
 
     b = Var
       $ Path [m, n]
+      $ varIdentText
       $ DotVarIdent (simpleUpperIdent B)
       $ EmptyTail
 
     c = Var
       $ Path []
+      $ varIdentText
       $ DotVarIdent (simpleIdent C)
       $ TailSlot
       $ EmptyTail
 
     d = Var
       $ Path []
+      $ varIdentText
       $ DotVarIdent (simpleIdent D)
       $ TailSlot
       $ TailSlot
@@ -100,20 +111,22 @@ test = describe "ParseExpr" $ do
 
     e = Var
       $ Path []
+      $ varIdentText
       $ DotVarIdent (simpleIdent E)
       $ TailSlot
       $ TailWord (simpleIdent F)
       $ TailSlot
       $ EmptyTail
 
-    add = Var $ Path [] $ OperatorIdent OpAdd
-    sub = Var $ Path [] $ OperatorIdent OpSub
-    mul = Var $ Path [] $ OperatorIdent OpMul
-    equ = Var $ Path [] $ OperatorIdent OpEqu
-    neg = Var $ Path [] $ PrefixOperatorIdent OpNegate
-    logicOr = Var $ Path [] $ OperatorIdent OpOr
+    add = Var $ Path [] $ varIdentText $ OperatorIdent OpAdd
+    sub = Var $ Path [] $ varIdentText $ OperatorIdent OpSub
+    mul = Var $ Path [] $ varIdentText $ OperatorIdent OpMul
+    equ = Var $ Path [] $ varIdentText $ OperatorIdent OpEqu
+    neg = Var $ Path [] $ varIdentText $ PrefixOperatorIdent OpNegate
+    logicOr = Var $ Path [] $ varIdentText $ OperatorIdent OpOr
 
     xPat = flip PatVar Nothing
+         $ varIdentText
          $ VarIdent (simpleIdent X)
          $ BodySlot
          $ EmptyTail
@@ -140,10 +153,10 @@ test = describe "ParseExpr" $ do
       parseExpr "` . e ( ) f ( ) `" `shouldBe` Right e
 
     it "parses escaped binary operators" $
-      parseExpr "` + `" `shouldBe` Right (Var (Path [] (OperatorIdent OpAdd)))
+      parseExpr "` + `" `shouldBe` Right (Var (Path [] (varIdentText (OperatorIdent OpAdd))))
 
     it "parses escaped prefix operators" $
-      parseExpr "` - ( ) `" `shouldBe` Right (Var (Path [] (PrefixOperatorIdent OpNegate)))
+      parseExpr "` - ( ) `" `shouldBe` Right (Var (Path [] (varIdentText (PrefixOperatorIdent OpNegate))))
 
     it "parses unsigned integer literals" $
       parseExpr "42" `shouldBe` Right (LitUInt 42)
@@ -256,12 +269,12 @@ test = describe "ParseExpr" $ do
 
     it "parses minimal partial dot calls" $
       parseExpr ". a" `shouldBe` Right
-        (PartialCallChain [(Path [] $ DotVarIdent (simpleIdent A) EmptyTail, Nothing)])
+        (PartialCallChain [(Path [] $ varIdentText $ DotVarIdent (simpleIdent A) EmptyTail, Nothing)])
 
     it "parses qualified partial dot calls" $
       parseExpr ". M :: N :: b" `shouldBe` Right
         (PartialCallChain
-          [ ( Path [ModuleIdent M [], ModuleIdent N []] $ DotVarIdent (simpleIdent B) EmptyTail
+          [ ( Path [simpleModule M, simpleModule N] $ varIdentText $ DotVarIdent (simpleIdent B) EmptyTail
             , Nothing
             )
           ]
@@ -269,22 +282,23 @@ test = describe "ParseExpr" $ do
 
     it "parses partial dot calls with slots" $
       parseExpr ". c ( )" `shouldBe` Right
-        (PartialCallChain [(Path [] $ DotVarIdent (simpleIdent C) $ TailSlot EmptyTail, Just Unit)])
+        (PartialCallChain [(Path [] $ varIdentText $ DotVarIdent (simpleIdent C) $ TailSlot EmptyTail, Just Unit)])
 
     it "parses partial dot calls with filled slots" $
       parseExpr ". c ( x )" `shouldBe` Right
-        (PartialCallChain [(Path [] $ DotVarIdent (simpleIdent C) $ TailSlot EmptyTail, Just x)])
+        (PartialCallChain [(Path [] $ varIdentText $ DotVarIdent (simpleIdent C) $ TailSlot EmptyTail, Just x)])
 
     it "parses partial dot calls with multiple slots" $
       parseExpr ". d ( M :: N :: y ) ( f )" `shouldBe` Right
         (PartialCallChain
-          [(Path [] $ DotVarIdent (simpleIdent D) $ TailSlot $ TailSlot EmptyTail, Just (Tuple y f))]
+          [(Path [] $ varIdentText $ DotVarIdent (simpleIdent D) $ TailSlot $ TailSlot EmptyTail, Just (Tuple y f))]
         )
 
     it "parses partal dot calls with words and slots interleaved" $
       parseExpr ". e ( f ) f ( M :: N :: G )" `shouldBe` Right
         (PartialCallChain
           [ ( Path []
+              $ varIdentText
               $ DotVarIdent (simpleIdent E)
               $ TailSlot
               $ TailWord (simpleIdent F)
@@ -297,8 +311,8 @@ test = describe "ParseExpr" $ do
     it "parses chained partial dot calls" $
       parseExpr ". a . M :: N :: b" `shouldBe` Right
         (PartialCallChain
-          [ (Path [] $ DotVarIdent (simpleIdent A) EmptyTail, Nothing)
-          , ( Path [ModuleIdent M [], ModuleIdent N []] $ DotVarIdent (simpleIdent B) EmptyTail
+          [ (Path [] $ varIdentText $ DotVarIdent (simpleIdent A) EmptyTail, Nothing)
+          , ( Path [simpleModule M, simpleModule N] $ varIdentText $ DotVarIdent (simpleIdent B) EmptyTail
             , Nothing
             )
           ]
@@ -307,8 +321,9 @@ test = describe "ParseExpr" $ do
     it "parses chained partial dot calls with slots" $
       parseExpr ". c ( x ) . e ( M :: N :: y ) f ( f )" `shouldBe` Right
         (PartialCallChain
-          [ (Path [] $ DotVarIdent (simpleIdent C) $ TailSlot EmptyTail, Just x)
+          [ (Path [] $ varIdentText $ DotVarIdent (simpleIdent C) $ TailSlot EmptyTail, Just x)
           , ( Path []
+              $ varIdentText
               $ DotVarIdent (simpleIdent E)
               $ TailSlot
               $ TailWord (simpleIdent F)

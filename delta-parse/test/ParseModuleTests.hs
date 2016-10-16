@@ -36,6 +36,7 @@ test = describe "ParseModule" $ do
         (SymbolsSpecific
           [ SymbolDef
           $ NoAlias
+          $ varIdentText
           $ VarIdent (simpleIdent F)
           $ BodySlot
           $ TailWord (simpleIdent G)
@@ -52,6 +53,7 @@ test = describe "ParseModule" $ do
         (SymbolsSpecific
           [ SymbolDef
           $ NoAlias
+          $ varIdentText
           $ DotVarIdent (simpleIdent F)
           $ TailSlot
           $ TailWord (simpleIdent G)
@@ -64,11 +66,11 @@ test = describe "ParseModule" $ do
 
   it "parses modules with binary-operator-notation def exports" $
     parseModule "export { == }" `shouldBe` Right
-      (Module (SymbolsSpecific [SymbolDef $ NoAlias $ OperatorIdent OpEqu]) [] [])
+      (Module (SymbolsSpecific [SymbolDef $ NoAlias $ varIdentText $ OperatorIdent OpEqu]) [] [])
 
   it "parses modules with prefix-operator-notation def exports" $
     parseModule "export { - ( ) }" `shouldBe` Right
-      (Module (SymbolsSpecific [SymbolDef $ NoAlias $ PrefixOperatorIdent OpNegate]) [] [])
+      (Module (SymbolsSpecific [SymbolDef $ NoAlias $ varIdentText $ PrefixOperatorIdent OpNegate]) [] [])
 
   it "parses modules with escaped def exports" $
     parseModule "export { ` do ` }" `shouldBe` Right
@@ -76,7 +78,8 @@ test = describe "ParseModule" $ do
         (SymbolsSpecific
           [ SymbolDef
           $ NoAlias
-          $ VarIdent (Ident (Alpha LowerCase D) [StartChar $ Alpha LowerCase O])
+          $ varIdentText
+          $ VarIdent (identText $ Ident (Alpha LowerCase D) [StartChar $ Alpha LowerCase O])
           $ BodySlot
           $ EmptyTail
           ]

@@ -2,14 +2,14 @@ module SyntaxUtils where
 
 import Syntax
 
-simpleIdent :: Letter -> Ident
-simpleIdent l = Ident (Alpha LowerCase l) []
+simpleIdent :: Letter -> IdentText
+simpleIdent l = identText $ Ident (Alpha LowerCase l) []
 
-simpleUpperIdent :: Letter -> Ident
-simpleUpperIdent l = Ident (Alpha UpperCase l) []
+simpleUpperIdent :: Letter -> IdentText
+simpleUpperIdent l = identText $ Ident (Alpha UpperCase l) []
 
-simpleVar :: Letter -> VarIdent
-simpleVar l = VarIdent (simpleIdent l) $ BodySlot EmptyTail
+simpleVar :: Letter -> VarIdentText
+simpleVar l = varIdentText $ VarIdent (simpleIdent l) $ BodySlot EmptyTail
 
 simplePatVar :: Letter -> Pat
 simplePatVar l = PatVar (simpleVar l) Nothing
@@ -17,17 +17,17 @@ simplePatVar l = PatVar (simpleVar l) Nothing
 simpleVarExpr :: Letter -> Expr
 simpleVarExpr l = Var $ Path [] $ simpleVar l
 
-simpleTIdent :: Letter -> TypeIdent
-simpleTIdent l = TypeIdent l []
+simpleTIdent :: Letter -> TypeIdentText
+simpleTIdent l = typeIdentText $ TypeIdent l []
 
-simpleTypeVar :: Letter -> TypeVarIdent
-simpleTypeVar l = TypeVarIdent l []
+simpleTypeVar :: Letter -> TypeVarIdentText
+simpleTypeVar l = typeVarIdentText $ TypeVarIdent l []
 
 simpleType :: Letter -> Type
 simpleType l = TypeAtom $ Path [] $ simpleTIdent l
 
-simpleModule :: Letter -> ModuleIdent
-simpleModule l = ModuleIdent l []
+simpleModule :: Letter -> ModuleIdentText
+simpleModule l = moduleIdentText $ ModuleIdent l []
 
-typeIdentPure :: TypeIdent
-typeIdentPure = TypeIdent P $ map (StartChar . Alpha LowerCase) [U, R, E]
+typeIdentPure :: TypeIdentText
+typeIdentPure = typeIdentText $ TypeIdent P $ map (StartChar . Alpha LowerCase) [U, R, E]

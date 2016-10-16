@@ -19,27 +19,31 @@ parseDecl = fmap stripDeclMarks . fullParse decl
 
 test :: Spec
 test = describe "ParseDecl" $ do
-  let typeVarDo = TypeVarIdent D [StartChar $ Alpha LowerCase O]
+  let typeVarDo = typeVarIdentText $ TypeVarIdent D [StartChar $ Alpha LowerCase O]
 
   describe "function defs" $ do
     describe "standard-notation defs" $ do
       let
-        f = VarIdent (simpleIdent F)
+        f = varIdentText
+          $ VarIdent (simpleIdent F)
           $ BodySlot
           $ EmptyTail
 
-        g = VarIdent (simpleIdent G)
+        g = varIdentText
+          $ VarIdent (simpleIdent G)
           $ BodySlot
           $ TailSlot
           $ EmptyTail
 
-        h = VarIdent (simpleIdent H)
+        h = varIdentText
+          $ VarIdent (simpleIdent H)
           $ BodySlot
           $ TailWord (simpleIdent I)
           $ TailSlot
           $ EmptyTail
 
-        i = VarIdent (simpleIdent I)
+        i = varIdentText
+          $ VarIdent (simpleIdent I)
           $ BodyWord (simpleIdent J)
           $ BodySlot
           $ EmptyTail
@@ -206,25 +210,30 @@ test = describe "ParseDecl" $ do
 
     describe "dot-notation defs" $ do
       let
-        f = DotVarIdent (simpleIdent F)
+        f = varIdentText
+          $ DotVarIdent (simpleIdent F)
           $ EmptyTail
 
-        g = DotVarIdent (simpleIdent G)
+        g = varIdentText
+          $ DotVarIdent (simpleIdent G)
           $ TailSlot
           $ EmptyTail
 
-        h = DotVarIdent (simpleIdent H)
+        h = varIdentText
+          $ DotVarIdent (simpleIdent H)
           $ TailSlot
           $ TailSlot
           $ EmptyTail
 
-        i = DotVarIdent (simpleIdent I)
+        i = varIdentText
+          $ DotVarIdent (simpleIdent I)
           $ TailSlot
           $ TailWord (simpleIdent J)
           $ TailSlot
           $ EmptyTail
 
-        j = DotVarIdent (simpleIdent J)
+        j = varIdentText
+          $ DotVarIdent (simpleIdent J)
           $ TailWord  (simpleIdent K)
           $ TailSlot
           $ EmptyTail
@@ -326,7 +335,7 @@ test = describe "ParseDecl" $ do
         parseDecl "def ( x : A ) - ( y : B ) ! C -> D { }" `shouldBe` Right
           (DeclDef
             (PatVar
-              (OperatorIdent OpSub)
+              (varIdentText $ OperatorIdent OpSub)
               (TypeFunc (TypeTuple (simpleType A) (simpleType B)) (simpleType C) (simpleType D))
             )
             []
@@ -337,7 +346,7 @@ test = describe "ParseDecl" $ do
         parseDecl "def - ( x : A ) ! B -> C { }" `shouldBe` Right
           (DeclDef
             (PatVar
-              (PrefixOperatorIdent OpNegate)
+              (varIdentText $ PrefixOperatorIdent OpNegate)
               (TypeFunc (simpleType A) (simpleType B) (simpleType C))
             )
             []
@@ -395,7 +404,7 @@ test = describe "ParseDecl" $ do
         (DeclTypeStruct
           (simpleTIdent A)
           []
-          [StructField (Ident (Alpha LowerCase D) [StartChar $ Alpha LowerCase O]) (simpleType B)]
+          [StructField (identText $ Ident (Alpha LowerCase D) [StartChar $ Alpha LowerCase O]) (simpleType B)]
         )
 
     it "parses structs with multiple fields" $
@@ -506,7 +515,7 @@ test = describe "ParseDecl" $ do
           (simpleTIdent A)
           (simpleTypeVar T)
           [StubDef
-            (VarIdent (simpleIdent F) $ BodySlot $ TailWord (simpleIdent G) $ TailSlot $ EmptyTail)
+            (varIdentText $ VarIdent (simpleIdent F) $ BodySlot $ TailWord (simpleIdent G) $ TailSlot $ EmptyTail)
             (TypeFunc (TypeTuple (simpleType A) (simpleType B)) (simpleType C) (simpleType D)) []
           ]
         )
@@ -516,7 +525,7 @@ test = describe "ParseDecl" $ do
         (DeclProtocol
           (simpleTIdent A)
           (simpleTypeVar T)
-          [StubDef (DotVarIdent (simpleIdent F) $ EmptyTail) (TypeFunc TypeUnit TypePure TypeUnit) []]
+          [StubDef (varIdentText $ DotVarIdent (simpleIdent F) $ EmptyTail) (TypeFunc TypeUnit TypePure TypeUnit) []]
         )
 
     it "parses protocols with nontrivial dot-notation def stubs" $
@@ -525,7 +534,8 @@ test = describe "ParseDecl" $ do
           (simpleTIdent A)
           (simpleTypeVar T)
           [StubDef
-            ( DotVarIdent (simpleIdent F)
+            ( varIdentText
+            $ DotVarIdent (simpleIdent F)
             $ TailSlot
             $ TailWord (simpleIdent G)
             $ TailSlot
@@ -546,7 +556,7 @@ test = describe "ParseDecl" $ do
           (simpleTIdent A)
           (simpleTypeVar T)
           [StubDef
-            (OperatorIdent OpSub)
+            (varIdentText $ OperatorIdent OpSub)
             (TypeFunc (TypeTuple (simpleType B) (simpleType C)) (simpleType D) (simpleType E)) []
           ]
         )
@@ -663,7 +673,7 @@ test = describe "ParseDecl" $ do
           (Path [] $ simpleTIdent A)
           (simpleType B) []
           [ ( PatVar
-              (VarIdent (simpleIdent F) $ BodySlot $ TailWord (simpleIdent G) $ TailSlot $ EmptyTail)
+              (varIdentText $ VarIdent (simpleIdent F) $ BodySlot $ TailWord (simpleIdent G) $ TailSlot $ EmptyTail)
               (TypeFunc (TypeTuple (simpleType A) (simpleType B)) (simpleType C) (simpleType D))
             , []
             , Func (PatTuple (simplePatVar X) (simplePatVar Y)) Unit
@@ -676,7 +686,7 @@ test = describe "ParseDecl" $ do
         (DeclImplement
           (Path [] $ simpleTIdent A)
           (simpleType B) []
-          [ ( PatVar (DotVarIdent (simpleIdent F) $ EmptyTail) (TypeFunc TypeUnit TypePure TypeUnit), []
+          [ ( PatVar (varIdentText $ DotVarIdent (simpleIdent F) $ EmptyTail) (TypeFunc TypeUnit TypePure TypeUnit), []
             , Func PatUnit Unit
             )
           ]
@@ -688,7 +698,8 @@ test = describe "ParseDecl" $ do
             (Path [] $ simpleTIdent A)
             (simpleType B) []
             [ ( PatVar
-                ( DotVarIdent (simpleIdent F)
+                ( varIdentText
+                $ DotVarIdent (simpleIdent F)
                 $ TailSlot
                 $ TailWord (simpleIdent G)
                 $ TailSlot
@@ -711,7 +722,7 @@ test = describe "ParseDecl" $ do
           (Path [] $ simpleTIdent A)
           (simpleType B) []
           [ ( PatVar
-              (OperatorIdent OpSub)
+              (varIdentText $ OperatorIdent OpSub)
               (TypeFunc (TypeTuple (simpleType C) (simpleType D)) (simpleType E) (simpleType F))
             , []
             , Func (PatTuple (simplePatVar X) (simplePatVar Y)) Unit
@@ -793,7 +804,7 @@ test = describe "ParseDecl" $ do
         (DeclInteraction
           (simpleTIdent A)
           []
-          [(Ident (Alpha LowerCase D) [StartChar $ Alpha LowerCase O], simpleType B, simpleType C)]
+          [(identText $ Ident (Alpha LowerCase D) [StartChar $ Alpha LowerCase O], simpleType B, simpleType C)]
         )
 
     it "rejects messages without explicit return types" $

@@ -81,7 +81,7 @@ assembleDef (Sig name args interType retType constraints) bodyExpr =
     (argPat, argType) = foldr1 tupleBoth $ map extractType args
     funcType = Stx.TypeFunc argType interType retType
   in
-    (Stx.PatVar name funcType, constraints, Stx.Func argPat bodyExpr)
+    (Stx.PatVar (Stx.varIdentText name) funcType, constraints, Stx.Func argPat bodyExpr)
 
 funcDef :: Parser Def
 funcDef =
@@ -113,7 +113,7 @@ stubDefSlot = char '(' *> spaces *> option Stx.TypeUnit type_ <* spaces <* char 
 
 assembleStubDef :: Sig Stx.Type -> Stx.Stub
 assembleStubDef (Sig name argType interType retType constraints) =
-  Stx.StubDef name (Stx.TypeFunc (foldr1 Stx.TypeTuple argType) interType retType) constraints
+  Stx.StubDef (Stx.varIdentText name) (Stx.TypeFunc (foldr1 Stx.TypeTuple argType) interType retType) constraints
 
 stubFuncDef :: Parser Stx.Stub
 stubFuncDef =
@@ -122,7 +122,7 @@ stubFuncDef =
 stubConstDef :: Parser Stx.Stub
 stubConstDef =
   (Stx.StubDef
-    <$> (escapableIdent <* spaces)
+    <$> (Stx.varIdentText <$> escapableIdent <* spaces)
     <*> (char ':' *> spaces *> possibleFunc <* spaces)
     <*> (whereClause <* spaces)
   ) <* char ';'
@@ -190,7 +190,7 @@ typeStruct =
       <*> (many $ char '<' *> spaces *> escapable typeVarIdent' <* spaces <* char '>' <* spaces)
       <*> structBody)
 
-message :: Parser (Stx.Ident, Stx.Type, Stx.Type)
+message :: Parser (Stx.IdentText, Stx.Type, Stx.Type)
 message =
   keyword "message" *> spaces *>
     ((,,)

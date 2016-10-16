@@ -45,10 +45,11 @@ test = describe "ParsePat" $ do
 
   let
     f = flip PatVar Nothing
-      $ VarIdent (Ident (Alpha LowerCase F) [])
+      $ varIdentText
+      $ VarIdent (simpleIdent F)
       $ BodySlot
-      $ TailWord (Ident (Alpha LowerCase G) [])
-      $ TailWord (Ident (Alpha LowerCase H) [])
+      $ TailWord (simpleIdent G)
+      $ TailWord (simpleIdent H)
       $ TailSlot
       $ EmptyTail
 

@@ -24,12 +24,12 @@ test = describe "ParseType" $ do
     b = simpleType B
     c = TypeAtom $ Path [simpleModule M, simpleModule N] $ simpleTIdent C
 
-    pureAtom = TypeAtom $ Path [] $ TypeIdent P $ map (StartChar . Alpha LowerCase) [U, R, E]
+    pureAtom = TypeAtom $ Path [] $ typeIdentText $ TypeIdent P $ map (StartChar . Alpha LowerCase) [U, R, E]
 
     x = TypeVar $ simpleTypeVar X
     y = TypeVar $ simpleTypeVar Y
 
-    doVar = TypeVar $ TypeVarIdent D [StartChar (Alpha LowerCase O)]
+    doVar = TypeVar $ typeVarIdentText $ TypeVarIdent D [StartChar (Alpha LowerCase O)]
 
   describe "type_" $ do
     it "parses unit" $

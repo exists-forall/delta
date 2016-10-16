@@ -34,22 +34,22 @@ formatIdent' (Stx.Ident c cs) = formatIdentStartChar c : map formatIdentChar cs
 formatIdent :: Stx.Ident -> Text
 formatIdent = pack . formatIdent'
 
-formatIdentTail :: Stx.VarIdentTail -> [String]
+formatIdentTail :: Stx.VarIdentTail -> [Text]
 formatIdentTail Stx.EmptyTail = []
-formatIdentTail (Stx.TailWord word rest) = (' ' : formatIdent' word) : formatIdentTail rest
+formatIdentTail (Stx.TailWord word rest) = " " : Stx.unwrapIdentText word : formatIdentTail rest
 formatIdentTail (Stx.TailSlot rest) = " ()" : formatIdentTail rest
 
-formatIdentBody :: Stx.VarIdentBody -> [String]
-formatIdentBody (Stx.BodyWord word rest) = (' ' : formatIdent' word) : formatIdentBody rest
+formatIdentBody :: Stx.VarIdentBody -> [Text]
+formatIdentBody (Stx.BodyWord word rest) = " " : Stx.unwrapIdentText word : formatIdentBody rest
 formatIdentBody (Stx.BodySlot rest) = " ()" : formatIdentTail rest
 
 formatVarIdent :: Stx.VarIdent -> Text
 
 formatVarIdent (Stx.VarIdent word rest) =
-  intercalate "" $ map pack $ formatIdent' word : formatIdentBody rest
+  intercalate "" $ Stx.unwrapIdentText word : formatIdentBody rest
 
 formatVarIdent (Stx.DotVarIdent word rest) =
-  intercalate "" $ map pack $ ('.' : formatIdent' word) : formatIdentTail rest
+  intercalate "" $ "." : Stx.unwrapIdentText word : formatIdentTail rest
 
 formatVarIdent (Stx.OperatorIdent op) =
   case op of

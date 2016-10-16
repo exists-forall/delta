@@ -42,19 +42,19 @@ test = describe "ParseIdent" $ do
 
   describe "ident" $ do
     it "parses lowercase identifiers" $
-      fullParse ident "foo" `shouldBe` Right fooIdent
+      fullParse ident "foo" `shouldBe` Right (identText fooIdent)
 
     it "parses uppercase identifiers" $
-      fullParse ident "BAR" `shouldBe` Right upperBarIdent
+      fullParse ident "BAR" `shouldBe` Right (identText upperBarIdent)
 
     it "parses identifiers containing underscores" $
-      fullParse ident "foo_bar" `shouldBe` Right (i (l F) [l' O, l' O, StartChar Underscore, l' B, l' A, l' R])
+      fullParse ident "foo_bar" `shouldBe` Right (identText (i (l F) [l' O, l' O, StartChar Underscore, l' B, l' A, l' R]))
 
     it "parses identifiers starting with underscores" $
-      fullParse ident "_foo" `shouldBe` Right (i Underscore [l' F, l' O, l' O])
+      fullParse ident "_foo" `shouldBe` Right (identText (i Underscore [l' F, l' O, l' O]))
 
     it "parses identifiers containing digits" $
-      fullParse ident "foo42" `shouldBe` Right (i (l F) [l' O, l' O, Digit D4, Digit D2])
+      fullParse ident "foo42" `shouldBe` Right (identText (i (l F) [l' O, l' O, Digit D4, Digit D2]))
 
     it "rejects identifiers starting with a digit" $
       fullParse ident "42foo" `shouldSatisfy` isLeft
@@ -68,7 +68,7 @@ test = describe "ParseIdent" $ do
   describe "moduleIdent'" $ do
     it "parses module identifiers" $
       fullParse (moduleIdent' ForbidReserved) "Foo_42" `shouldBe`
-        Right (ModuleIdent F [l' O, l' O, StartChar Underscore, Digit D4, Digit D2])
+        Right (moduleIdentText (ModuleIdent F [l' O, l' O, StartChar Underscore, Digit D4, Digit D2]))
 
     it "rejects module identifiers starting with a lowercase letter" $
       fullParse (moduleIdent' AllowReserved) "foo_42" `shouldSatisfy` isLeft
@@ -82,30 +82,34 @@ test = describe "ParseIdent" $ do
   describe "varIdent'" $ do
     it "parses single-identifier variables" $
       fullParse (varIdent' ForbidReserved) "foo" `shouldBe`
-        Right (VarIdent fooIdent $ BodySlot $ EmptyTail)
+        Right (VarIdent (identText fooIdent) $ BodySlot $ EmptyTail)
 
     it "parses single-identifier variables with an explicit slot" $
       fullParse (varIdent' ForbidReserved) "foo()" `shouldBe`
-        Right (VarIdent fooIdent $ BodySlot EmptyTail)
+        Right (VarIdent (identText fooIdent) $ BodySlot EmptyTail)
 
     it "parses variables with multiple words" $
       fullParse (varIdent' ForbidReserved) "foo BAR baz ()" `shouldBe`
-        Right (VarIdent fooIdent $ BodyWord upperBarIdent $ BodyWord bazIdent $ BodySlot EmptyTail)
+        Right (
+          VarIdent (identText fooIdent) $
+          BodyWord (identText upperBarIdent) $
+          BodyWord (identText bazIdent) $
+          BodySlot EmptyTail)
 
     it "parses variables with multiple slots" $
       fullParse (varIdent' ForbidReserved) "foo () ()" `shouldBe`
-        Right (VarIdent fooIdent $ BodySlot $ TailSlot EmptyTail)
+        Right (VarIdent (identText fooIdent) $ BodySlot $ TailSlot EmptyTail)
 
     it "parses variables with words and slots interleaved" $
       fullParse (varIdent' ForbidReserved) "foo BAR () (  ) baz () biz" `shouldBe`
         Right (
-          VarIdent fooIdent $
-          BodyWord upperBarIdent $
+          VarIdent (identText fooIdent) $
+          BodyWord (identText upperBarIdent) $
           BodySlot $
           TailSlot $
-          TailWord bazIdent $
+          TailWord (identText bazIdent) $
           TailSlot $
-          TailWord bizIdent $
+          TailWord (identText bizIdent) $
           EmptyTail)
 
     it "rejects empty variables" $
@@ -119,30 +123,30 @@ test = describe "ParseIdent" $ do
 
     it "parses dot variables" $
       fullParse (varIdent' ForbidReserved) ".foo" `shouldBe`
-        Right (DotVarIdent fooIdent EmptyTail)
+        Right (DotVarIdent (identText fooIdent) EmptyTail)
 
     it "parses dot variables with multiple words and whitespace" $
       fullParse (varIdent' ForbidReserved) ". foo BAR" `shouldBe`
-        Right (DotVarIdent fooIdent $ TailWord upperBarIdent EmptyTail)
+        Right (DotVarIdent (identText fooIdent) $ TailWord (identText upperBarIdent) EmptyTail)
 
     it "parses dot variables with slots" $
       fullParse (varIdent' ForbidReserved) ".foo()" `shouldBe`
-        Right (DotVarIdent fooIdent $ TailSlot EmptyTail)
+        Right (DotVarIdent (identText fooIdent) $ TailSlot EmptyTail)
 
     it "parses dot variables with multiple slots" $
       fullParse (varIdent' ForbidReserved) ".foo () ()" `shouldBe`
-        Right (DotVarIdent fooIdent $ TailSlot $ TailSlot EmptyTail)
+        Right (DotVarIdent (identText fooIdent) $ TailSlot $ TailSlot EmptyTail)
 
     it "parses dot varaibles with words and slots interleaved" $
       fullParse (varIdent' ForbidReserved) ".foo BAR () ( ) baz () biz" `shouldBe`
         Right (
-          DotVarIdent fooIdent $
-          TailWord upperBarIdent $
+          DotVarIdent (identText fooIdent) $
+          TailWord (identText upperBarIdent) $
           TailSlot $
           TailSlot $
-          TailWord bazIdent $
+          TailWord (identText bazIdent) $
           TailSlot $
-          TailWord bizIdent $
+          TailWord (identText bizIdent) $
           EmptyTail)
 
     it "rejects empty dot variables" $
@@ -154,7 +158,7 @@ test = describe "ParseIdent" $ do
   describe "typeIdent'" $ do
     it "parses type identifiers" $
       fullParse (typeIdent' ForbidReserved) "Foo_42" `shouldBe`
-        Right (TypeIdent F [l' O, l' O, StartChar Underscore, Digit D4, Digit D2])
+        Right (typeIdentText $ TypeIdent F [l' O, l' O, StartChar Underscore, Digit D4, Digit D2])
 
     it "rejects type identifiers starting with a lowercase letter" $
       fullParse (typeIdent' AllowReserved) "foo_42" `shouldSatisfy` isLeft
@@ -167,17 +171,17 @@ test = describe "ParseIdent" $ do
 
   describe "path" $ do
     it "parses simple paths" $
-      fullParse path "M::" `shouldBe` Right [ModuleIdent M []]
+      fullParse path "M::" `shouldBe` Right [moduleIdentText $ ModuleIdent M []]
 
     it "parses paths with multiple components" $
-      fullParse path "M::N::" `shouldBe` Right [ModuleIdent M [], ModuleIdent N []]
+      fullParse path "M::N::" `shouldBe` Right [moduleIdentText $ ModuleIdent M [], moduleIdentText $ ModuleIdent N []]
 
     it "parses paths with whitespace between components" $
-      fullParse path "M :: N ::" `shouldBe` Right [ModuleIdent M [], ModuleIdent N []]
+      fullParse path "M :: N ::" `shouldBe` Right [moduleIdentText $ ModuleIdent M [], moduleIdentText $ ModuleIdent N []]
 
     it "rejects paths containing reserved words" $
       fullParse path "M::Pure::" `shouldSatisfy` isLeft
 
     it "parses paths containing escaped reserved words" $
       fullParse path "M :: ` Pure ` ::" `shouldBe`
-        Right [ModuleIdent M [], ModuleIdent P $ map (StartChar . Alpha LowerCase) [U, R, E]]
+        Right [moduleIdentText $ ModuleIdent M [], moduleIdentText $ ModuleIdent P $ map (StartChar . Alpha LowerCase) [U, R, E]]

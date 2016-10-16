@@ -8,17 +8,37 @@ module Syntax
   , IdentStartChar (..)
   , Digit (..)
   , IdentChar (..)
+
   , Ident (..)
+  , IdentText
+  , identText
+  , unwrapIdentText
 
   , OperatorIdent (..)
   , PrefixOperatorIdent (..)
   , VarIdentTail (..)
   , VarIdentBody (..)
+
   , VarIdent (..)
+  , VarIdentText
+  , varIdentText
+  , unwrapVarIdentText
 
   , TypeIdent (..)
+  , TypeIdentText
+  , typeIdentText
+  , unwrapTypeIdentText
+
   , TypeVarIdent (..)
+  , TypeVarIdentText
+  , typeVarIdentText
+  , unwrapTypeVarIdentText
+
   , ModuleIdent (..)
+  , ModuleIdentText
+  , moduleIdentText
+  , unwrapModuleIdentText
+
   , Path (..)
 
   , StringComponent (..)
@@ -46,22 +66,10 @@ where
 import GHC.Generics (Generic)
 
 import qualified Data.Aeson.Types as Aeson
-import Data.Text.Lazy (fromStrict)
-import Data.Text (unpack)
+import Data.Text (Text)
 
-import ParseUtils (Parser, fullParse, SourcePos)
-import {-# SOURCE #-} ParseIdent
+import ParseUtils (SourcePos)
 import {-# SOURCE #-} FormatIdent
-
-toJSONParser :: String -> (CheckReserved -> Parser a) -> Aeson.Value -> Aeson.Parser a
-
-toJSONParser typeName p (Aeson.String src) =
-  case fullParse (p AllowReserved) (fromStrict src) of
-    Right result -> return result
-    Left _ -> fail ("Malformed " ++ typeName ++ ": " ++ unpack src)
-
-toJSONParser typeName _ x =
-  Aeson.typeMismatch typeName x
 
 {-
 This might seem like madness, but there is an exact one-to-one correspondence between valid Delta
@@ -74,11 +82,15 @@ data Digit = D0|D1|D2|D3|D4|D5|D6|D7|D8|D9 deriving (Eq, Ord, Show, Enum)
 data IdentChar = StartChar IdentStartChar | Digit Digit deriving (Eq, Ord, Show)
 data Ident = Ident IdentStartChar [IdentChar] deriving (Eq, Ord, Show)
 
-instance Aeson.FromJSON Ident where
-  parseJSON = toJSONParser "Ident" ident'
+newtype IdentText
+  = IdentText Text
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
-instance Aeson.ToJSON Ident where
-  toJSON = Aeson.String . formatIdent
+identText :: Ident -> IdentText
+identText = IdentText . formatIdent
+
+unwrapIdentText :: IdentText -> Text
+unwrapIdentText (IdentText t) = t
 
 data OperatorIdent
   -- Mathematical operators
@@ -97,51 +109,67 @@ data PrefixOperatorIdent
   deriving (Eq, Ord, Show)
 
 -- As with identifiers, this perfectly encodes the invariants of valid variable names.
-data VarIdentTail = EmptyTail | TailWord Ident VarIdentTail | TailSlot VarIdentTail deriving (Eq, Ord, Show)
-data VarIdentBody = BodyWord Ident VarIdentBody | BodySlot VarIdentTail deriving (Eq, Ord, Show)
+data VarIdentTail = EmptyTail | TailWord IdentText VarIdentTail | TailSlot VarIdentTail deriving (Eq, Ord, Show)
+data VarIdentBody = BodyWord IdentText VarIdentBody | BodySlot VarIdentTail deriving (Eq, Ord, Show)
 data VarIdent
-  = VarIdent Ident VarIdentBody
-  | DotVarIdent Ident VarIdentTail
+  = VarIdent IdentText VarIdentBody
+  | DotVarIdent IdentText VarIdentTail
   | OperatorIdent OperatorIdent
   | PrefixOperatorIdent PrefixOperatorIdent
   deriving (Eq, Ord, Show)
 
-instance Aeson.FromJSON VarIdent where
-  parseJSON = toJSONParser "VarIdent" varIdent'
+newtype VarIdentText
+  = VarIdentText Text
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
-instance Aeson.ToJSON VarIdent where
-  toJSON = Aeson.String . formatVarIdent
+varIdentText :: VarIdent -> VarIdentText
+varIdentText = VarIdentText . formatVarIdent
+
+unwrapVarIdentText :: VarIdentText -> Text
+unwrapVarIdentText (VarIdentText t) = t
 
 -- All types begin with an uppercase letter
 data TypeIdent = TypeIdent Letter [IdentChar] deriving (Eq, Ord, Show)
 
-instance Aeson.FromJSON TypeIdent where
-  parseJSON = toJSONParser "TypeIdent" typeIdent'
+newtype TypeIdentText
+  = TypeIdentText Text
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
-instance Aeson.ToJSON TypeIdent where
-  toJSON = Aeson.String . formatTypeIdent
+typeIdentText :: TypeIdent -> TypeIdentText
+typeIdentText = TypeIdentText . formatTypeIdent
+
+unwrapTypeIdentText :: TypeIdentText -> Text
+unwrapTypeIdentText (TypeIdentText t) = t
 
 -- All type variables begin with a lowercase letter
 data TypeVarIdent = TypeVarIdent Letter [IdentChar] deriving (Eq, Ord, Show)
 
-instance Aeson.FromJSON TypeVarIdent where
-  parseJSON = toJSONParser "TypeVarIdent" typeVarIdent'
+newtype TypeVarIdentText
+  = TypeVarIdentText Text
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
-instance Aeson.ToJSON TypeVarIdent where
-  toJSON = Aeson.String . formatTypeVarIdent
+typeVarIdentText :: TypeVarIdent -> TypeVarIdentText
+typeVarIdentText = TypeVarIdentText . formatTypeVarIdent
+
+unwrapTypeVarIdentText :: TypeVarIdentText -> Text
+unwrapTypeVarIdentText (TypeVarIdentText t) = t
 
 -- All module names begin with an uppercase letter
 data ModuleIdent = ModuleIdent Letter [IdentChar] deriving (Eq, Ord, Show)
 
-instance Aeson.FromJSON ModuleIdent where
-  parseJSON = toJSONParser "ModuleIdent" moduleIdent'
+newtype ModuleIdentText
+  = ModuleIdentText Text
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
-instance Aeson.ToJSON ModuleIdent where
-  toJSON = Aeson.String . formatModuleIdent
+moduleIdentText :: ModuleIdent -> ModuleIdentText
+moduleIdentText = ModuleIdentText . formatModuleIdent
+
+unwrapModuleIdentText :: ModuleIdentText -> Text
+unwrapModuleIdentText (ModuleIdentText t) = t
 
 data Path a
   = Path
-    { path :: [ModuleIdent]
+    { path :: [ModuleIdentText]
     , name :: a
     }
   deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
@@ -157,7 +185,7 @@ data StringComponent
 
 data Pat' annot
   = PatVar
-    { pat_var_name :: VarIdent
+    { pat_var_name :: VarIdentText
     , pat_var_type :: annot
     }
   | PatTuple
@@ -180,7 +208,7 @@ type TypedPat = Pat' Type
 
 data Expr
   = Var
-    { var_name :: Path VarIdent
+    { var_name :: Path VarIdentText
     }
   | LitUInt
     { uint_value :: Integer
@@ -210,7 +238,7 @@ data Expr
     , let_body :: Expr
     }
   | PartialCallChain
-    { partial_calls :: [(Path VarIdent, Maybe Expr)]
+    { partial_calls :: [(Path VarIdentText, Maybe Expr)]
     }
   -- NOTE: PartialCallChain encodes neither the invariant that the VarIdent should always be a
   -- DotVarIdent, nor the inavriant that the list of composed functions should always be nonempty.
@@ -224,10 +252,10 @@ data Expr
 
 data Type
   = TypeAtom
-    { type_name :: Path TypeIdent
+    { type_name :: Path TypeIdentText
     }
   | TypeVar
-    { type_var_name :: TypeVarIdent
+    { type_var_name :: TypeVarIdentText
     }
   | TypeApp
     { type_head :: Type
@@ -258,18 +286,18 @@ data Type
 
 data StructComponent
   = StructField
-    { struct_field_name :: Ident
+    { struct_field_name :: IdentText
     , struct_field_type :: Type
     }
   | StructCase
-    { struct_case_name :: TypeIdent
+    { struct_case_name :: TypeIdentText
     , struct_case_body :: [StructComponent]
     }
   deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
 data Constraint
   = ConstraintImplement
-    { constraint_implement_protocol :: Path TypeIdent
+    { constraint_implement_protocol :: Path TypeIdentText
     , constraint_implement_argument :: Type
     }
   deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
@@ -281,25 +309,25 @@ data Decl
     , decl_def_value :: Expr
     }
   | DeclTypeStruct
-    { decl_type_struct_name :: TypeIdent
-    , decl_type_struct_params :: [TypeVarIdent]
+    { decl_type_struct_name :: TypeIdentText
+    , decl_type_struct_params :: [TypeVarIdentText]
     , decl_type_struct_body :: [StructComponent]
     }
   | DeclProtocol
-    { decl_protocol_name :: TypeIdent
-    , decl_protocol_param :: TypeVarIdent
+    { decl_protocol_name :: TypeIdentText
+    , decl_protocol_param :: TypeVarIdentText
     , decl_protocol_body :: [Stub]
     }
   | DeclImplement
-    { decl_implement_protocol :: Path TypeIdent
+    { decl_implement_protocol :: Path TypeIdentText
     , decl_implement_argument :: Type
     , decl_implement_constraints :: [Constraint]
     , decl_implement_body :: [(TypedPat, [Constraint], Expr)]
     }
   | DeclInteraction
-    { decl_interaction_name :: TypeIdent
-    , decl_interaction_params :: [TypeVarIdent]
-    , decl_interaction_body :: [(Ident, Type, Type)]
+    { decl_interaction_name :: TypeIdentText
+    , decl_interaction_params :: [TypeVarIdentText]
+    , decl_interaction_body :: [(IdentText, Type, Type)]
     }
   | MarkDecl
     { decl_source_start :: SourcePos
@@ -310,12 +338,12 @@ data Decl
 
 data Stub
   = StubDef
-    { stub_def_name :: VarIdent
+    { stub_def_name :: VarIdentText
     , stub_def_type :: Type
     , stub_def_constraints :: [Constraint]
     }
   | StubImplement
-    { stub_implement_protocol :: Path TypeIdent
+    { stub_implement_protocol :: Path TypeIdentText
     , stub_implement_argument :: Type
     , stub_implement_constraints :: [Constraint]
     }
@@ -333,16 +361,16 @@ data PossibleAlias a
 
 data Symbol
   = SymbolType
-    { symbol_type :: PossibleAlias TypeIdent
+    { symbol_type :: PossibleAlias TypeIdentText
     }
   | SymbolInteraction
-    { symbol_interaction :: PossibleAlias TypeIdent
+    { symbol_interaction :: PossibleAlias TypeIdentText
     }
   | SymbolProtocol
-    { symbol_protocol :: PossibleAlias TypeIdent
+    { symbol_protocol :: PossibleAlias TypeIdentText
     }
   | SymbolDef
-    { symbol_def :: PossibleAlias VarIdent
+    { symbol_def :: PossibleAlias VarIdentText
     }
   deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
@@ -355,7 +383,7 @@ data Symbols
 
 data Import
   = Import
-    { import_module :: PossibleAlias (Path ModuleIdent)
+    { import_module :: PossibleAlias (Path ModuleIdentText)
     , import_symbols :: Symbols
     }
   deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)

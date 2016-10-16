@@ -29,8 +29,10 @@ slot =
     , func
     ]
 
-qualifiedCall :: Parser (Stx.VarIdent, [Stx.Expr]) -> Parser (Stx.Path Stx.VarIdent, [Stx.Expr])
-qualifiedCall p = first <$> (Stx.Path <$> path) <*> p
+qualifiedCall ::
+  Parser (Stx.VarIdent, [Stx.Expr]) ->
+  Parser (Stx.Path Stx.VarIdentText, [Stx.Expr])
+qualifiedCall p = first <$> (Stx.Path <$> path) <*> (first Stx.varIdentText <$> p)
 
 callNonDot :: Parser Stx.Expr
 callNonDot =
@@ -38,7 +40,7 @@ callNonDot =
   assemble (varName, args) = Stx.Call (Stx.Var varName) (foldr1 Stx.Tuple args)
 
 var :: Parser Stx.Expr
-var = mark $ Stx.Var <$> (Stx.Path <$> path <*> escapableIdent)
+var = mark $ Stx.Var <$> (Stx.Path <$> path <*> (Stx.varIdentText <$> escapableIdent))
 
 litUInt :: Parser Stx.Expr
 litUInt = mark $ (Stx.LitUInt . read) <$> many1 digit
@@ -141,7 +143,7 @@ atomicExpr = choice
   ]
 
 data Suffix
-  = SuffixDotCall (Stx.Path Stx.VarIdent) [Stx.Expr]
+  = SuffixDotCall (Stx.Path Stx.VarIdentText) [Stx.Expr]
   | SuffixCall Stx.Expr
 
 dotCall :: Parser Suffix
@@ -193,7 +195,7 @@ prefixes =
   choice
     [ mark $
       Stx.Call
-        <$> ((Stx.Var . Stx.Path [] . Stx.PrefixOperatorIdent) <$> prefixOperatorIdent <* spaces)
+        <$> ((Stx.Var . Stx.Path [] . Stx.varIdentText . Stx.PrefixOperatorIdent) <$> prefixOperatorIdent <* spaces)
         <*> prefixes
     , suffixes
     ]
@@ -210,7 +212,8 @@ operators =
   UngroupedTerm <$> prefixes <*> (spaces *> optionMaybe ((,) <$> operator <*> (spaces *> operators)))
 
 opToExpr :: BinaryOperator -> Stx.Expr -> Stx.Expr -> Stx.Expr
-opToExpr (FunOp op) a b = Stx.Call (Stx.Var (Stx.Path [] (Stx.OperatorIdent op))) (Stx.Tuple a b)
+opToExpr (FunOp op) a b =
+  Stx.Call (Stx.Var (Stx.Path [] (Stx.varIdentText (Stx.OperatorIdent op)))) (Stx.Tuple a b)
 opToExpr TupleOp a b = Stx.Tuple a b
 
 groupedOperators :: Parser Stx.Expr

@@ -26,7 +26,7 @@ symbol =
       (Stx.SymbolInteraction <$> possibleAlias (escapable typeIdent'))
     , keyword "protocol" *> spaces *>
       (Stx.SymbolProtocol <$> possibleAlias (escapable typeIdent'))
-    , Stx.SymbolDef <$> possibleAlias (escapable varIdent')
+    , Stx.SymbolDef <$> possibleAlias (Stx.varIdentText <$> escapable varIdent')
     ]
 
 symbols :: Parser Stx.Symbols

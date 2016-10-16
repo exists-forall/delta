@@ -17,7 +17,7 @@ patVar :: Parser annot -> Parser (Stx.Pat' annot)
 patVar annot =
   markPat $
   Stx.PatVar
-    <$> (escapableIdent <* spaces)
+    <$> (Stx.varIdentText <$> escapableIdent <* spaces)
     <*> annot
 
 patIgnore :: Parser annot -> Parser (Stx.Pat' annot)
