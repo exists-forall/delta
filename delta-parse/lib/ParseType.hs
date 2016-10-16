@@ -7,7 +7,7 @@ where
 
 import ParseUtils
 
-import qualified Syntax as Stx
+import qualified Delta.Structures.Syntax as Stx
 import ParseIdent (keyword, escapable, path, typeIdent', typeVarIdent')
 
 markType :: Parser Stx.Type -> Parser Stx.Type

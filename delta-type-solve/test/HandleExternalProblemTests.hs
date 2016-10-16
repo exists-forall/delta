@@ -4,7 +4,7 @@ module HandleExternalProblemTests (test) where
 
 import Data.Text (Text)
 
-import ExternalProblem
+import Delta.Structures.TypeSolve
 import HandleExternalProblem
 
 import Test.Hspec

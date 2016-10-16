@@ -1,6 +1,6 @@
 module Main where
 
-import ExternalProblem
+import Delta.Structures.TypeSolve
 import HandleExternalProblem (solveExternal)
 
 import Data.Aeson (encode, eitherDecode')

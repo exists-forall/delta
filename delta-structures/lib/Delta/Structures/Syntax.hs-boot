@@ -1,4 +1,4 @@
-module Syntax where
+module Delta.Structures.Syntax where
 
 data Ident
 data ModuleIdent

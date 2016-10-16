@@ -3,7 +3,7 @@
 
 module ParseUtils
   ( module Text.Parsec
-  , SourcePos (..)
+  , module Delta.Structures.Syntax
   , fromParsecSourcePos
   , getPosition
   , Parser
@@ -21,16 +21,10 @@ import GHC.Generics (Generic)
 import Text.Parsec hiding (space, spaces, getPosition, SourcePos)
 import qualified Text.Parsec as Parsec
 import qualified Text.Parsec.Char as ParsecChar (space)
-import Data.Aeson.Types (FromJSON, ToJSON)
 
 import Data.Text.Lazy (Text)
 
-data SourcePos
-  = SourcePos
-    { line :: Int
-    , col :: Int
-    }
-  deriving (Eq, Ord, Show, Generic, FromJSON, ToJSON)
+import Delta.Structures.Syntax (SourcePos (..))
 
 fromParsecSourcePos :: Parsec.SourcePos -> SourcePos
 fromParsecSourcePos pos = SourcePos (Parsec.sourceLine pos) (Parsec.sourceColumn pos)

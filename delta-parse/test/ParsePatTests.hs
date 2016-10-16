@@ -8,7 +8,7 @@ import Test.Hspec
 
 import ParsePat
 
-import Syntax
+import Delta.Structures.Syntax
 import StripMarks (stripPatMarks, stripTypeMarks)
 import ParseUtils
 import SyntaxUtils

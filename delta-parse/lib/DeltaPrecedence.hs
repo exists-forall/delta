@@ -6,7 +6,7 @@ where
 
 import Precedence
 
-import qualified Syntax as Stx
+import qualified Delta.Structures.Syntax as Stx
 
 data BinaryOperator
   = FunOp Stx.OperatorIdent

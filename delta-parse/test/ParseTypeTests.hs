@@ -7,7 +7,7 @@ import Data.Text.Lazy (Text)
 import Test.Hspec
 
 import ParseType
-import Syntax
+import Delta.Structures.Syntax
 import StripMarks (stripTypeMarks)
 import ParseUtils
 import SyntaxUtils

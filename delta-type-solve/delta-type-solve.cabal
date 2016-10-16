@@ -22,11 +22,11 @@ executable delta-type-solve
                      , text
                      , aeson
                      , bytestring
+                     , delta-structures
 
 library
   hs-source-dirs:      lib
-  exposed-modules:     ExternalProblem
-                     , HandleExternalProblem
+  exposed-modules:     HandleExternalProblem
   other-modules:       IndexSet
                      , PosetSubsetSession
                      , TopoSort
@@ -48,6 +48,7 @@ library
                      , transformers
                      , text
                      , aeson
+                     , delta-structures
 
 test-suite delta-type-solve-tests
   type:                exitcode-stdio-1.0
@@ -80,9 +81,6 @@ test-suite delta-type-solve-tests
                      , TypeInfer
                      , TypeInferTests
 
-                     , ExternalProblem
-                     , ExternalProblemTests
-
                      , HandleExternalProblem
                      , HandleExternalProblemTests
 
@@ -102,3 +100,4 @@ test-suite delta-type-solve-tests
                      , transformers
                      , text
                      , aeson
+                     , delta-structures

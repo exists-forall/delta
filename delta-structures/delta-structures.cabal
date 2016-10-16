@@ -1,0 +1,24 @@
+name:                delta-structures
+version:             0.1.0.0
+synopsis:            Intermediate data structures generated and consumed by passes of the delta compiler
+description:         Please see README.md
+homepage:            https://github.com/SelectricSimian/delta-structures#readme
+license:             BSD3
+license-file:        LICENSE
+author:              William Brandon
+maintainer:          hypercube97@gmail.com
+copyright:           Copyright: (c) 2016 William Brandon
+category:            Compiler
+build-type:          Simple
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      lib
+  exposed-modules:     Delta.Structures.Syntax
+                     , Delta.Structures.TypeSolve
+  other-modules:       Utils.FormatIdent
+  build-depends:       base >= 4.7 && < 5
+                     , aeson
+                     , containers
+                     , text
+  default-language:    Haskell2010

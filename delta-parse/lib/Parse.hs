@@ -16,7 +16,7 @@ import Data.Text.Lazy (Text)
 import Data.Aeson.Types (FromJSON, ToJSON)
 
 import ParseUtils
-import qualified Syntax as Stx
+import qualified Delta.Structures.Syntax as Stx
 import ParseModule (module_)
 import ParseDecl (decl)
 import ParseExpr (expr)

@@ -6,7 +6,7 @@
 
 module HandleExternalProblem (solveExternal) where
 
-import qualified ExternalProblem as External
+import qualified Delta.Structures.TypeSolve as External
 
 import PosetSubsetSession
 import TypeInfer

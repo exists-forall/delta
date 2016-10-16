@@ -1,6 +1,6 @@
 module StripMarks where
 
-import Syntax
+import Delta.Structures.Syntax
 import Data.Bifunctor (second)
 
 stripPatMarks :: (annot -> annot) -> Pat' annot -> Pat' annot

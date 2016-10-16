@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module FormatIdent
+module Utils.FormatIdent
   ( formatIdent
   , formatVarIdent
   , formatTypeIdent
@@ -9,7 +9,7 @@ module FormatIdent
   )
 where
 
-import qualified Syntax as Stx
+import qualified Delta.Structures.Syntax as Stx
 
 import Data.Text (Text, intercalate, pack)
 

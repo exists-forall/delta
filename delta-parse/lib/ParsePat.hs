@@ -6,7 +6,7 @@ where
 
 import ParseUtils
 
-import qualified Syntax as Stx
+import qualified Delta.Structures.Syntax as Stx
 import ParseIdent (escapableIdent)
 import ParseType (possibleFunc)
 

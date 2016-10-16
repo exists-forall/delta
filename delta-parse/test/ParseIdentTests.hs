@@ -6,7 +6,7 @@ import Data.Either (isLeft)
 
 import ParseUtils
 import ParseIdent
-import Syntax hiding (path)
+import Delta.Structures.Syntax hiding (path)
 
 import Test.Hspec
 

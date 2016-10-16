@@ -9,7 +9,7 @@ import Test.Hspec
 
 import Data.Either (isLeft)
 
-import Syntax
+import Delta.Structures.Syntax
 
 -- Convenient aliases
 

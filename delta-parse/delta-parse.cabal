@@ -21,12 +21,12 @@ executable delta-parse
                      , text
                      , bytestring
                      , aeson
+                     , delta-structures
   default-language:    Haskell2010
 
 library
   hs-source-dirs:      lib
-  exposed-modules:     Syntax
-                     , Parse
+  exposed-modules:     Parse
 
   other-modules:       ParseUtils
                      , ParseIdent
@@ -37,7 +37,6 @@ library
                      , ParseModule
                      , Precedence
                      , DeltaPrecedence
-                     , FormatIdent
                      , StripRedundantMarks
 
   build-depends:       base >= 4.7 && < 5
@@ -45,6 +44,7 @@ library
                      , text
                      , containers
                      , aeson
+                     , delta-structures
   default-language:    Haskell2010
 
 test-suite delta-parse-tests
@@ -52,10 +52,8 @@ test-suite delta-parse-tests
   hs-source-dirs:      test, lib
   main-is:             Spec.hs
 
-  other-modules:       Syntax
-                     , ParseUtils
+  other-modules:       ParseUtils
                      , SyntaxUtils
-                     , FormatIdent
                      , StripMarks
 
                      , ParseIdent
@@ -87,5 +85,6 @@ test-suite delta-parse-tests
                      , text
                      , containers
                      , aeson
+                     , delta-structures
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010

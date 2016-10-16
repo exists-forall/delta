@@ -2,8 +2,10 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 
-module Syntax
-  ( Letter (..)
+module Delta.Structures.Syntax
+  ( SourcePos (..)
+
+  , Letter (..)
   , Capitalization (..)
   , IdentStartChar (..)
   , Digit (..)
@@ -68,8 +70,14 @@ import GHC.Generics (Generic)
 import qualified Data.Aeson.Types as Aeson
 import Data.Text (Text)
 
-import ParseUtils (SourcePos)
-import {-# SOURCE #-} FormatIdent
+import {-# SOURCE #-} Utils.FormatIdent
+
+data SourcePos
+  = SourcePos
+    { line :: Int
+    , col :: Int
+    }
+  deriving (Eq, Ord, Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
 {-
 This might seem like madness, but there is an exact one-to-one correspondence between valid Delta

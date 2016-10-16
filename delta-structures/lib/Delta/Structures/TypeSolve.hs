@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 
-module ExternalProblem where
+module Delta.Structures.TypeSolve where
 
 import Data.Text (Text)
 import GHC.Generics

@@ -1,6 +1,6 @@
 module SyntaxUtils where
 
-import Syntax
+import Delta.Structures.Syntax
 
 simpleIdent :: Letter -> IdentText
 simpleIdent l = identText $ Ident (Alpha LowerCase l) []
